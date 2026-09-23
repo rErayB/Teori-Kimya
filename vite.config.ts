@@ -6,6 +6,7 @@ import {defineConfig} from 'vite';
 export default defineConfig(() => {
   return {
     plugins: [react(), tailwindcss()],
+    base: '/',
     resolve: {
       alias: {
         '@': path.resolve(import.meta.dirname ?? '.'),
@@ -14,6 +15,15 @@ export default defineConfig(() => {
     build: {
       target: ['es2020', 'safari14'],
       cssTarget: 'safari14',
+      rollupOptions: {
+        output: {
+          manualChunks(id: string) {
+            if (id.includes('html5-qrcode')) return 'vendor-qrcode';
+            if (id.includes('lucide-react')) return 'vendor-icons';
+            if (id.includes('react') || id.includes('react-dom')) return 'vendor-react';
+          },
+        },
+      },
     },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
