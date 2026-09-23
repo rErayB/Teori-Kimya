@@ -1262,10 +1262,52 @@ const KEYS = {
   PRODUCT_RETURNS: 'teori_kimya_product_returns_v2',
 };
 
+// In-memory fallback store for iOS Safari Private Browsing or restricted environments
+const memoryFallbackStore: Record<string, string> = {};
+
+function isStorageAvailable(): boolean {
+  try {
+    if (typeof window === 'undefined') return false;
+    const testKey = '__tk_safari_test__';
+    window.localStorage.setItem(testKey, '1');
+    window.localStorage.removeItem(testKey);
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+const storageAvailable = isStorageAvailable();
+
+// Safe storage getter
+function safeGet(key: string): string | null {
+  try {
+    if (storageAvailable && typeof window !== 'undefined' && window.localStorage) {
+      const val = window.localStorage.getItem(key);
+      if (val !== null) return val;
+    }
+  } catch (e) {
+    console.warn(`[SafeStorage] localStorage read error for ${key}:`, e);
+  }
+  return memoryFallbackStore[key] ?? null;
+}
+
+// Safe storage setter
+function safeSet(key: string, value: string): void {
+  memoryFallbackStore[key] = value;
+  try {
+    if (storageAvailable && typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(key, value);
+    }
+  } catch (e) {
+    console.warn(`[SafeStorage] localStorage write error for ${key}:`, e);
+  }
+}
+
 // Safe JSON loader
 function loadFromStorage<T>(key: string, fallback: T): T {
   try {
-    const item = localStorage.getItem(key);
+    const item = safeGet(key);
     if (!item) return fallback;
     return JSON.parse(item) as T;
   } catch (e) {
@@ -1276,7 +1318,7 @@ function loadFromStorage<T>(key: string, fallback: T): T {
 
 function saveToStorage<T>(key: string, data: T): void {
   try {
-    localStorage.setItem(key, JSON.stringify(data));
+    safeSet(key, JSON.stringify(data));
   } catch (e) {
     console.error(`Failed to save ${key} to storage:`, e);
   }

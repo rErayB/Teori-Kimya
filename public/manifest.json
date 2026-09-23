@@ -1,0 +1,10 @@
+{
+  "short_name": "Teori Kimya",
+  "name": "TEORİ KİMYA - ERP & B2B Portal",
+  "icons": [],
+  "start_url": "/",
+  "background_color": "#07111F",
+  "theme_color": "#07111F",
+  "display": "standalone",
+  "orientation": "any"
+}

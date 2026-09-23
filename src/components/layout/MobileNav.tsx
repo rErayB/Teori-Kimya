@@ -34,7 +34,10 @@ export const MobileNav: React.FC<MobileNavProps> = ({
   ];
 
   return (
-    <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-[#07111F]/95 backdrop-blur-lg border-t border-cyan-500/20 px-2 py-1.5 flex items-center justify-around select-none">
+    <nav
+      className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-[#07111F]/95 backdrop-blur-lg border-t border-cyan-500/20 px-2 pt-1.5 flex items-center justify-around select-none"
+      style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom, 0px))' }}
+    >
       {tabs.map((tab) => {
         const isActive = activeTab === tab.id;
         return (
