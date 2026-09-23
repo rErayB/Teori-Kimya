@@ -47,7 +47,14 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="h-18 px-4 sm:px-6 bg-[#0B1B2E]/95 backdrop-blur-md border-b border-cyan-500/15 flex items-center justify-between gap-3 text-slate-100 sticky top-0 z-20">
+    <header
+      className="px-4 sm:px-6 bg-[#0B1B2E]/95 backdrop-blur-md border-b border-cyan-500/15 flex items-center justify-between gap-3 text-slate-100 sticky top-0 z-20"
+      style={{
+        paddingTop: 'calc(0.75rem + env(safe-area-inset-top, 0px))',
+        paddingBottom: '0.75rem',
+        minHeight: '4.5rem',
+      }}
+    >
       {/* Mobile brand & menu trigger */}
       <div className="flex items-center gap-3">
         <button

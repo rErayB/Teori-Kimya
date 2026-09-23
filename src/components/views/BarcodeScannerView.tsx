@@ -39,16 +39,33 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
   const [notFoundBarcode, setNotFoundBarcode] = useState<string | null>(null);
   const [quickSellQuantity, setQuickSellQuantity] = useState(1);
   const [quickSellSuccess, setQuickSellSuccess] = useState<string | null>(null);
+  const [quickSellError, setQuickSellError] = useState<string | null>(null);
 
   // Real Camera Scanner State
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [isCameraLoading, setIsCameraLoading] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [availableCameras, setAvailableCameras] = useState<{ id: string; label: string }[]>([]);
+  const [activeCameraId, setActiveCameraId] = useState<string | null>(null);
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const lastScannedTimeRef = useRef<number>(0);
   const lastScannedCodeRef = useRef<string>('');
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // iOS Safari requires video element to have playsinline and webkit-playsinline attributes
+  const enforceVideoPlaysInline = () => {
+    try {
+      const videos = document.querySelectorAll<HTMLVideoElement>('#qr-reader-container video');
+      videos.forEach((video) => {
+        video.setAttribute('playsinline', 'true');
+        video.setAttribute('webkit-playsinline', 'true');
+        video.setAttribute('muted', 'true');
+        video.muted = true;
+        video.play?.().catch(() => {});
+      });
+    } catch (_) {}
+  };
 
   // Focus input automatically on mount
   useEffect(() => {
@@ -67,6 +84,7 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
     if (!code) return;
 
     setQuickSellSuccess(null);
+    setQuickSellError(null);
     const prod = repository.getProductByBarcode(code);
 
     if (prod) {
@@ -78,7 +96,7 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
     }
   };
 
-  const startCamera = async () => {
+  const startCamera = async (targetCameraId?: string) => {
     setIsCameraLoading(true);
     setCameraError(null);
 
@@ -95,8 +113,33 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
       }
 
       // Check if mediaDevices is supported
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Tarayıcınız kamera erişimini desteklemiyor veya güvenli (HTTPS/localhost) bağlantıda değilsiniz.');
+      if (typeof navigator === 'undefined' || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error(
+          'Tarayıcınız kamera erişimini desteklemiyor veya bağlantınız HTTPS ile korunmuyor. Netlify üzerinden HTTPS bağlantısı kullandığınızdan emin olun.'
+        );
+      }
+
+      // Query devices if possible
+      let cameraToUse: any = { facingMode: 'environment' };
+      try {
+        const devices = await Html5Qrcode.getCameras();
+        if (devices && devices.length > 0) {
+          setAvailableCameras(devices);
+          if (targetCameraId) {
+            cameraToUse = targetCameraId;
+            setActiveCameraId(targetCameraId);
+          } else {
+            // Find rear camera on iPhone/Android
+            const rearCamera =
+              devices.find((d) => /back|rear|arka|environment|telephoto|wide/i.test(d.label)) ||
+              devices[devices.length - 1]; // On iOS, back camera is usually last
+            cameraToUse = rearCamera.id;
+            setActiveCameraId(rearCamera.id);
+          }
+        }
+      } catch (devErr) {
+        console.warn('Could not enumerate cameras, falling back to facingMode:', devErr);
+        cameraToUse = { facingMode: 'environment' };
       }
 
       const formatsToSupport = [
@@ -121,36 +164,41 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
         aspectRatio: 1.333333,
       };
 
-      // Prefer rear camera on mobile devices
-      await html5QrCode.start(
-        { facingMode: 'environment' },
-        config,
-        (decodedText) => {
-          // Debounce duplicate scans within 2.5 seconds
-          const now = Date.now();
-          if (
-            decodedText === lastScannedCodeRef.current &&
-            now - lastScannedTimeRef.current < 2500
-          ) {
-            return;
-          }
-          lastScannedCodeRef.current = decodedText;
-          lastScannedTimeRef.current = now;
-
-          // Haptic feedback on supported mobile devices
-          if ('vibrate' in navigator) {
-            try {
-              navigator.vibrate(100);
-            } catch (_) {}
-          }
-
-          setBarcodeInput(decodedText);
-          handleScan(decodedText);
-        },
-        () => {
-          // Frame error ignored
+      const onScanSuccess = (decodedText: string) => {
+        // Debounce duplicate scans within 2.5 seconds
+        const now = Date.now();
+        if (
+          decodedText === lastScannedCodeRef.current &&
+          now - lastScannedTimeRef.current < 2500
+        ) {
+          return;
         }
-      );
+        lastScannedCodeRef.current = decodedText;
+        lastScannedTimeRef.current = now;
+
+        // Haptic feedback on supported mobile devices
+        if ('vibrate' in navigator) {
+          try {
+            navigator.vibrate(100);
+          } catch (_) {}
+        }
+
+        setBarcodeInput(decodedText);
+        handleScan(decodedText);
+      };
+
+      try {
+        await html5QrCode.start(cameraToUse, config, onScanSuccess, () => {});
+      } catch (firstErr) {
+        console.warn('First camera start attempt failed, falling back to environment facingMode:', firstErr);
+        // Fallback for iOS Safari if specific camera ID failed
+        await html5QrCode.start({ facingMode: 'environment' }, config, onScanSuccess, () => {});
+      }
+
+      // Force video playsinline for iOS Safari
+      enforceVideoPlaysInline();
+      setTimeout(enforceVideoPlaysInline, 200);
+      setTimeout(enforceVideoPlaysInline, 600);
 
       setIsCameraActive(true);
     } catch (err: any) {
@@ -158,12 +206,21 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
       let message = 'Kamera başlatılamadı.';
       const errStr = err?.message || String(err);
 
-      if (err?.name === 'NotAllowedError' || errStr.includes('NotAllowedError') || errStr.includes('Permission denied')) {
-        message = 'Kamera izni reddedildi. Lütfen tarayıcınızın adres çubuğundaki kilit simgesine dokunarak kamera erişimine izin veriniz.';
-      } else if (err?.name === 'NotFoundError' || errStr.includes('NotFoundError') || errStr.includes('Requested device not found')) {
+      if (
+        err?.name === 'NotAllowedError' ||
+        errStr.includes('NotAllowedError') ||
+        errStr.includes('Permission denied')
+      ) {
+        message =
+          'Kamera izni reddedildi. iOS Safari kullanıyorsanız: Adres çubuğundaki "aA" veya kilit simgesine dokunun > "Web Sitesi Ayarları" > "Kamera" seçeneğini "İzin Ver" olarak değiştirin ve sayfayı yenileyin.';
+      } else if (
+        err?.name === 'NotFoundError' ||
+        errStr.includes('NotFoundError') ||
+        errStr.includes('Requested device not found')
+      ) {
         message = 'Cihazınızda kullanılabilir bir kamera bulunamadı.';
       } else if (err?.name === 'NotReadableError' || errStr.includes('NotReadableError')) {
-        message = 'Kamera başka bir uygulama veya sekme tarafından meşgul ediliyor.';
+        message = 'Kamera başka bir uygulama veya sekme tarafından kullanılıyor olabilir.';
       } else {
         message = `Kamera hatası: ${errStr}`;
       }
@@ -191,10 +248,19 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
     setIsCameraLoading(false);
   };
 
+  const handleSwitchCamera = (newCamId: string) => {
+    stopCamera().then(() => {
+      startCamera(newCamId);
+    });
+  };
+
   const handleQuickSale = () => {
     if (!scannedProduct) return;
+    setQuickSellError(null);
+    setQuickSellSuccess(null);
+
     if (scannedProduct.stock < quickSellQuantity) {
-      alert(`Yetersiz stok! Mevcut stok: ${scannedProduct.stock} ${scannedProduct.unit}`);
+      setQuickSellError(`Yetersiz stok! Mevcut stok: ${scannedProduct.stock} ${scannedProduct.unit}`);
       return;
     }
 
@@ -221,6 +287,8 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
       // Refresh scanned product data
       const updated = repository.getProductById(scannedProduct.id);
       if (updated) setScannedProduct(updated);
+    } else {
+      setQuickSellError(result.error || 'Satış işlemi tamamlanamadı.');
     }
   };
 
@@ -289,7 +357,7 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
                 type="button"
                 variant="primary"
                 size="lg"
-                onClick={startCamera}
+                onClick={() => startCamera()}
                 disabled={isCameraLoading}
                 icon={isCameraLoading ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Camera className="w-5 h-5" />}
                 title="Canlı Kamerayı Başlat"
@@ -313,7 +381,7 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
             <Button
               size="sm"
               variant="secondary"
-              onClick={startCamera}
+              onClick={() => startCamera()}
               icon={<RefreshCw className="w-3.5 h-3.5" />}
             >
               Tekrar Dene
@@ -330,8 +398,25 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
             {/* Visual Guide Overlay */}
             <div className="absolute top-3 left-3 flex items-center gap-2 px-3 py-1 rounded-full bg-black/70 border border-cyan-400/40 text-cyan-300 text-xs font-mono backdrop-blur-sm pointer-events-none z-10">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
-              <span>Canlı Arka Kamera Aktif (EAN-13, EAN-8, UPC, QR)</span>
+              <span>Canlı Kamera Aktif (EAN-13, EAN-8, UPC, QR)</span>
             </div>
+
+            {/* Camera Switcher for Multi-Camera iPhones */}
+            {availableCameras.length > 1 && (
+              <div className="absolute top-3 right-3 z-10">
+                <select
+                  value={activeCameraId || ''}
+                  onChange={(e) => handleSwitchCamera(e.target.value)}
+                  className="bg-slate-900/90 border border-cyan-400/40 text-white text-xs rounded-lg px-2 py-1 backdrop-blur cursor-pointer"
+                >
+                  {availableCameras.map((cam, idx) => (
+                    <option key={cam.id} value={cam.id}>
+                      {cam.label || `Kamera ${idx + 1}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div className="absolute bottom-3 right-3 z-10">
               <button
@@ -380,6 +465,14 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
           >
             Faturayı Gör
           </button>
+        </div>
+      )}
+
+      {/* Error Notification Alert */}
+      {quickSellError && (
+        <div className="p-4 rounded-xl bg-red-950/50 border border-red-500/50 text-red-200 text-xs flex items-center gap-2 animate-in fade-in">
+          <AlertCircle className="w-5 h-5 text-red-400 shrink-0" />
+          <span>{quickSellError}</span>
         </div>
       )}
 

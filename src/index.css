@@ -3,6 +3,57 @@
 :root {
   font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   color-scheme: dark;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* iOS Safari & WebKit Touch & Interaction Optimization */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button, a, select, input[type="button"], input[type="submit"], [role="button"] {
+  touch-action: manipulation;
+  cursor: pointer;
+}
+
+/* iOS Safari: Prevent viewport auto-zoom on input focus by guaranteeing 16px font-size on mobile */
+@media screen and (max-width: 768px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Dynamic Viewport & iOS Height Fix */
+html, body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  min-height: -webkit-fill-available;
+  min-height: 100dvh;
+  background-color: #07111F;
+}
+
+#root {
+  min-height: 100%;
+  min-height: -webkit-fill-available;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* iOS Momentum Smooth Scrolling */
+.overflow-y-auto, .overflow-x-auto, .overflow-auto {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Safe Area Inset Helpers for iPhone Notch, Dynamic Island, and Home Indicator */
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 /* Custom scrollbars */
@@ -32,6 +83,7 @@
 .glass-card {
   background: rgba(16, 42, 67, 0.6);
   backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   border: 1px solid rgba(85, 187, 217, 0.12);
 }
 

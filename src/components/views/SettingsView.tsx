@@ -35,6 +35,7 @@ export const SettingsView: React.FC = () => {
 
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+  const [backupMessage, setBackupMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSaveCompany = (e: React.FormEvent) => {
@@ -68,10 +69,10 @@ export const SettingsView: React.FC = () => {
       if (content) {
         const success = repository.importDatabaseJson(content);
         if (success) {
-          alert('Yedek başarıyla yüklendi! Sistem verileri güncellendi.');
-          window.location.reload();
+          setBackupMessage({ type: 'success', text: 'Yedek başarıyla yüklendi! Sistem verileri güncellendi.' });
+          setTimeout(() => window.location.reload(), 1200);
         } else {
-          alert('Hata: Geçersiz yedek dosyası formatı!');
+          setBackupMessage({ type: 'error', text: 'Hata: Geçersiz yedek dosyası formatı!' });
         }
       }
     };
@@ -80,8 +81,8 @@ export const SettingsView: React.FC = () => {
 
   const handleResetDefaults = () => {
     repository.resetAllData();
-    alert('Sistem fabrika varsayılanlarına sıfırlandı.');
-    window.location.reload();
+    setBackupMessage({ type: 'success', text: 'Sistem fabrika varsayılanlarına başarıyla sıfırlandı.' });
+    setTimeout(() => window.location.reload(), 1200);
   };
 
   return (
@@ -103,6 +104,23 @@ export const SettingsView: React.FC = () => {
         <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 text-xs flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-emerald-400" />
           <span>Firma bilgileri başarıyla kaydedildi!</span>
+        </div>
+      )}
+
+      {backupMessage && (
+        <div
+          className={`p-3 rounded-xl text-xs flex items-center gap-2 ${
+            backupMessage.type === 'success'
+              ? 'bg-emerald-950/40 border border-emerald-500/40 text-emerald-300'
+              : 'bg-red-950/40 border border-red-500/40 text-red-300'
+          }`}
+        >
+          {backupMessage.type === 'success' ? (
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          ) : (
+            <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+          )}
+          <span>{backupMessage.text}</span>
         </div>
       )}
 

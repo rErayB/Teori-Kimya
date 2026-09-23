@@ -51,15 +51,15 @@ export const Modal: React.FC<ModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto bg-black/75 backdrop-blur-sm animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto bg-black/75 backdrop-blur-sm animate-in fade-in duration-150 safe-top safe-bottom"
       onClick={onClose}
     >
       <div
-        className={`relative w-full ${maxWidthStyles[effectiveMaxWidth]} my-auto overflow-hidden rounded-2xl bg-[#0B1B2E] border border-cyan-500/25 shadow-2xl shadow-black/80 flex flex-col max-h-[92vh] text-slate-100 animate-in zoom-in-95 duration-150`}
+        className={`relative w-full ${maxWidthStyles[effectiveMaxWidth]} my-auto overflow-hidden rounded-2xl bg-[#0B1B2E] border border-cyan-500/25 shadow-2xl shadow-black/80 flex flex-col max-h-[88dvh] max-h-[calc(100dvh-2.5rem)] text-slate-100 animate-in zoom-in-95 duration-150`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-cyan-500/15 bg-gradient-to-r from-[#0B1B2E] via-[#102A43] to-[#0B1B2E]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-cyan-500/15 bg-gradient-to-r from-[#0B1B2E] via-[#102A43] to-[#0B1B2E] shrink-0">
           <div>
             <h3 className="text-lg font-bold text-white tracking-wide flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[#55BBD9]" />
@@ -75,8 +75,13 @@ export const Modal: React.FC<ModalProps> = ({
           </button>
         </div>
 
-        {/* Modal Body */}
-        <div className="p-6 overflow-y-auto space-y-4 flex-1">{children}</div>
+        {/* Modal Body with smooth touch scrolling */}
+        <div
+          className="p-6 overflow-y-auto space-y-4 flex-1"
+          style={{ WebkitOverflowScrolling: 'touch' }}
+        >
+          {children}
+        </div>
       </div>
     </div>
   );

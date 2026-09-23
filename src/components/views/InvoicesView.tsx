@@ -98,7 +98,7 @@ export const InvoicesView: React.FC = () => {
       setCancellingSale(null);
       setCancellationReason('Müşteri talebi / Yanlış kesim');
     } else {
-      alert(result.error || 'Satış iptal edilemedi.');
+      setToastMessage(result.error || 'Satış iptal edilemedi.');
     }
   };
 

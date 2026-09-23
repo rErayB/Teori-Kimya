@@ -77,7 +77,7 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <div className="min-h-screen bg-[#07111F] text-slate-100 flex flex-col font-sans">
+      <div className="min-h-screen min-h-[100dvh] bg-[#07111F] text-slate-100 flex flex-col font-sans">
         <div className="flex-1 flex overflow-hidden">
           {/* Desktop Collapsible Sidebar */}
           <Sidebar
@@ -129,7 +129,7 @@ export default function App() {
             />
 
             {/* Dynamic View Body */}
-            <main className="flex-1 p-4 sm:p-6 lg:p-8 pb-20 lg:pb-8 max-w-7xl mx-auto w-full">
+            <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full pb-[calc(6rem+env(safe-area-inset-bottom,0px))] lg:pb-8">
               {activeTab === 'dashboard' && (
                 <DashboardView
                   onNavigate={handleSelectTab}
