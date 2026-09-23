@@ -16,6 +16,8 @@ import { OrdersView } from './components/views/OrdersView';
 import { CustomersView } from './components/views/CustomersView';
 import { InvoicesView } from './components/views/InvoicesView';
 import { CatalogView } from './components/views/CatalogView';
+import { PurchasesView } from './components/views/PurchasesView';
+import { ExpensesView } from './components/views/ExpensesView';
 import { RawMaterialsView } from './components/views/RawMaterialsView';
 import { ProductionView } from './components/views/ProductionView';
 import { RecipesView } from './components/views/RecipesView';
@@ -104,6 +106,8 @@ export default function App() {
                   userRole={userRole}
                   criticalStockCount={criticalStockCount}
                   pendingOrdersCount={pendingOrdersCount}
+                  isMobile={true}
+                  onCloseMobile={() => setMobileMenuOpen(false)}
                 />
               </div>
             </div>
@@ -141,6 +145,8 @@ export default function App() {
               {activeTab === 'orders' && <OrdersView />}
               {activeTab === 'customers' && <CustomersView />}
               {activeTab === 'invoices' && <InvoicesView />}
+              {activeTab === 'purchases' && <PurchasesView onNavigate={handleSelectTab} />}
+              {activeTab === 'expenses' && <ExpensesView onNavigate={handleSelectTab} />}
               {activeTab === 'catalog' && (
                 <CatalogView
                   userRole={userRole}

@@ -41,6 +41,7 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenScanner }) => {
   >([]);
 
   const [barcodeInput, setBarcodeInput] = useState('');
+  const [inputQuantity, setInputQuantity] = useState<number>(1);
   const [searchProductQuery, setSearchProductQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Hepsi');
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
@@ -73,22 +74,25 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenScanner }) => {
 
     const matchedProduct = repository.getProductByBarcode(code);
     if (matchedProduct) {
-      addToCart(matchedProduct);
+      addToCart(matchedProduct, inputQuantity);
       setBarcodeInput('');
+      setInputQuantity(1);
       setErrorMessage(null);
     } else {
       setErrorMessage(`"${code}" barkoduna sahip ürün sistemde bulunamadı.`);
     }
   };
 
-  // Add product to cart (or increment quantity if already exists)
-  const addToCart = (product: Product) => {
+  // Add product to cart with custom quantity support
+  const addToCart = (product: Product, quantityToAdd: number = 1) => {
     setErrorMessage(null);
+    const qty = Math.max(1, quantityToAdd);
+
     setCart((prev) => {
       const existingIndex = prev.findIndex((item) => item.product.id === product.id);
       if (existingIndex > -1) {
         const item = prev[existingIndex];
-        const nextQty = item.quantity + 1;
+        const nextQty = item.quantity + qty;
         if (nextQty > product.stock) {
           setErrorMessage(`Yetersiz stok! "${product.name}" için mevcut stok: ${product.stock} ${product.unit}`);
           return prev;
@@ -101,11 +105,15 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenScanner }) => {
           setErrorMessage(`"${product.name}" tükenmiş! Stokta bulunmuyor.`);
           return prev;
         }
+        if (qty > product.stock) {
+          setErrorMessage(`Yetersiz stok! "${product.name}" için mevcut stok: ${product.stock} ${product.unit}`);
+          return prev;
+        }
         return [
           ...prev,
           {
             product,
-            quantity: 1,
+            quantity: qty,
             unitPrice: product.salePrice,
             discountRate: product.discountRate || 0,
           },
@@ -130,6 +138,23 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenScanner }) => {
           return item;
         })
         .filter((item) => item.quantity > 0);
+    });
+  };
+
+  const setExactQuantity = (productId: string, qty: number) => {
+    setErrorMessage(null);
+    setCart((prev) => {
+      return prev.map((item) => {
+        if (item.product.id === productId) {
+          const clamped = Math.max(1, qty);
+          if (clamped > item.product.stock) {
+            setErrorMessage(`Yetersiz stok! "${item.product.name}" için mevcut stok: ${item.product.stock} ${item.product.unit}`);
+            return { ...item, quantity: item.product.stock };
+          }
+          return { ...item, quantity: clamped };
+        }
+        return item;
+      });
     });
   };
 
@@ -238,10 +263,10 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenScanner }) => {
     <div className="h-[calc(100vh-6rem)] flex flex-col lg:flex-row gap-4 animate-in fade-in duration-200">
       {/* Left side: Product catalog & quick selection */}
       <div className="flex-1 flex flex-col gap-3 min-w-0">
-        {/* Search & Barcode Bar */}
+        {/* Search & Barcode & Quick Quantity Bar */}
         <div className="p-3 rounded-2xl bg-[#0B1B2E] border border-cyan-500/20 shadow-md flex flex-wrap sm:flex-nowrap items-center gap-2">
           {/* Barcode scanner input */}
-          <form onSubmit={handleBarcodeSubmit} className="flex-1 relative flex items-center">
+          <form onSubmit={handleBarcodeSubmit} className="flex-1 relative flex items-center min-w-[200px]">
             <Barcode className="w-5 h-5 text-cyan-400 absolute left-3 pointer-events-none" />
             <input
               ref={barcodeInputRef}
@@ -253,12 +278,57 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenScanner }) => {
             />
           </form>
 
+          {/* Quick Quantity Input Multiplier */}
+          <div className="flex items-center gap-1 bg-[#102A43] border border-cyan-500/30 rounded-xl px-2 py-1 shrink-0">
+            <span className="text-[11px] text-cyan-300 font-bold">Miktar:</span>
+            <button
+              type="button"
+              onClick={() => setInputQuantity((q) => Math.max(1, q - 1))}
+              className="w-6 h-6 rounded bg-slate-800 text-slate-200 hover:text-white flex items-center justify-center font-black text-xs cursor-pointer"
+            >
+              -
+            </button>
+            <input
+              type="number"
+              min="1"
+              value={inputQuantity}
+              onChange={(e) => setInputQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+              className="w-12 bg-transparent text-center text-white font-black text-xs focus:outline-none"
+              title="Eklemek istediğiniz miktarı klavyeden yazın"
+            />
+            <button
+              type="button"
+              onClick={() => setInputQuantity((q) => q + 1)}
+              className="w-6 h-6 rounded bg-slate-800 text-slate-200 hover:text-white flex items-center justify-center font-black text-xs cursor-pointer"
+            >
+              +
+            </button>
+
+            {/* Quick preset buttons */}
+            <div className="hidden sm:flex items-center gap-1 border-l border-slate-700 pl-1.5 ml-0.5">
+              {[5, 10, 25].map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => setInputQuantity(preset)}
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition-colors cursor-pointer ${
+                    inputQuantity === preset
+                      ? 'bg-cyan-500 text-black font-bold'
+                      : 'bg-slate-800 text-slate-300 hover:text-white'
+                  }`}
+                >
+                  {preset}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Product text search filter */}
-          <div className="w-full sm:w-48 relative">
+          <div className="w-full sm:w-44 relative">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
             <input
               type="text"
-              placeholder="İsimle ara..."
+              placeholder="İsimle filtrele..."
               value={searchProductQuery}
               onChange={(e) => setSearchProductQuery(e.target.value)}
               className="w-full bg-[#102A43]/60 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-cyan-400"
@@ -290,7 +360,12 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenScanner }) => {
             return (
               <div
                 key={prod.id}
-                onClick={() => !isOutOfStock && addToCart(prod)}
+                onClick={() => {
+                  if (!isOutOfStock) {
+                    addToCart(prod, inputQuantity);
+                    setInputQuantity(1);
+                  }
+                }}
                 className={`p-3 rounded-2xl bg-[#0B1B2E] border transition-all flex flex-col justify-between select-none ${
                   isOutOfStock
                     ? 'opacity-40 border-slate-800 cursor-not-allowed'
@@ -320,10 +395,15 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenScanner }) => {
                 </div>
 
                 <div className="mt-3 pt-2 border-t border-slate-800/80 flex items-center justify-between">
-                  <span className="text-xs font-black text-[#8DE7F2]">
-                    {prod.salePrice.toLocaleString('tr-TR')} ₺
+                  <div>
+                    <span className="text-xs font-black text-cyan-300">
+                      {prod.salePrice.toLocaleString('tr-TR')} ₺
+                    </span>
+                    <span className="text-[9px] text-slate-400 block">+%{prod.vatRate} KDV</span>
+                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-cyan-950/80 text-cyan-300 border border-cyan-500/30">
+                    {inputQuantity > 1 ? `+${inputQuantity} Ekle` : 'Ekle'}
                   </span>
-                  <span className="text-[10px] text-slate-400">+%20 KDV</span>
                 </div>
               </div>
             );
@@ -403,59 +483,109 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenScanner }) => {
               const lineDiscounted = lineBase - lineDisc;
               const lineVat = lineDiscounted * (item.product.vatRate / 100);
               const lineTotal = lineDiscounted + lineVat;
+              const unitProfit = item.unitPrice - item.product.purchasePrice;
 
               return (
-                <div key={item.product.id} className="pt-2 first:pt-0 space-y-1.5 text-xs">
+                <div key={item.product.id} className="pt-2.5 pb-1 first:pt-0 space-y-1.5 text-xs">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
                       <p className="font-bold text-white truncate">{item.product.name}</p>
                       <p className="text-[10px] text-slate-400 font-mono">
-                        {item.product.barcode} | {item.unitPrice.toLocaleString('tr-TR')} ₺/birim
+                        Birim Fiyat: {item.unitPrice.toLocaleString('tr-TR')} ₺ / {item.product.unit}
                       </p>
                     </div>
-                    <span className="font-black text-cyan-300 text-sm">
-                      {lineTotal.toLocaleString('tr-TR')} ₺
-                    </span>
+                    <div className="text-right">
+                      <span className="font-black text-cyan-300 text-sm">
+                        {lineTotal.toLocaleString('tr-TR')} ₺
+                      </span>
+                      <p className="text-[9px] text-emerald-400 font-medium">
+                        Kâr: +{(item.quantity * unitProfit).toLocaleString('tr-TR')} ₺
+                      </p>
+                    </div>
                   </div>
 
-                  {/* Quantity & Discount row */}
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1 bg-[#102A43] border border-cyan-500/25 rounded-lg p-0.5">
+                  {/* Quantity manual input & buttons & Discount row */}
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-0.5 bg-[#102A43] border border-cyan-500/30 rounded-lg p-0.5">
+                        <button
+                          type="button"
+                          onClick={() => updateQuantity(item.product.id, -1)}
+                          className="w-6 h-6 rounded bg-slate-800 flex items-center justify-center text-slate-200 hover:bg-slate-700 font-black cursor-pointer"
+                          title="1 Azalt"
+                        >
+                          <Minus className="w-3 h-3" />
+                        </button>
+                        <input
+                          type="number"
+                          min="1"
+                          max={item.product.stock}
+                          value={item.quantity}
+                          onChange={(e) => setExactQuantity(item.product.id, parseInt(e.target.value) || 1)}
+                          className="w-12 bg-transparent text-center font-black text-white text-xs py-0.5 focus:outline-none"
+                          title="Klavyeden miktar yazabilirsiniz"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => updateQuantity(item.product.id, 1)}
+                          className="w-6 h-6 rounded bg-slate-800 flex items-center justify-center text-slate-200 hover:bg-slate-700 font-black cursor-pointer"
+                          title="1 Artır"
+                        >
+                          <Plus className="w-3 h-3" />
+                        </button>
+                      </div>
+
+                      {/* Quick preset increments */}
                       <button
-                        onClick={() => updateQuantity(item.product.id, -1)}
-                        className="w-6 h-6 rounded bg-slate-800 flex items-center justify-center text-slate-200 hover:bg-slate-700 cursor-pointer"
+                        type="button"
+                        onClick={() => updateQuantity(item.product.id, 5)}
+                        className="px-1.5 py-1 rounded bg-[#102A43] hover:bg-cyan-900/50 border border-slate-700 text-cyan-300 font-mono text-[10px] cursor-pointer"
+                        title="+5 Adet Ekle"
                       >
-                        <Minus className="w-3 h-3" />
+                        +5
                       </button>
-                      <span className="w-8 text-center font-bold text-white text-xs">
-                        {item.quantity}
-                      </span>
                       <button
-                        onClick={() => updateQuantity(item.product.id, 1)}
-                        className="w-6 h-6 rounded bg-slate-800 flex items-center justify-center text-slate-200 hover:bg-slate-700 cursor-pointer"
+                        type="button"
+                        onClick={() => updateQuantity(item.product.id, 10)}
+                        className="px-1.5 py-1 rounded bg-[#102A43] hover:bg-cyan-900/50 border border-slate-700 text-cyan-300 font-mono text-[10px] cursor-pointer"
+                        title="+10 Adet Ekle"
                       >
-                        <Plus className="w-3 h-3" />
+                        +10
                       </button>
                     </div>
 
-                    <div className="flex items-center gap-1 text-[11px] text-slate-400">
-                      <span>İsk.%:</span>
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={item.discountRate}
-                        onChange={(e) => updateDiscount(item.product.id, parseFloat(e.target.value) || 0)}
-                        className="w-12 bg-[#102A43] border border-slate-700 rounded px-1.5 py-0.5 text-white text-center"
-                      />
-                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1 text-[11px] text-slate-400">
+                        <span>İsk%:</span>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={item.discountRate}
+                          onChange={(e) => updateDiscount(item.product.id, parseFloat(e.target.value) || 0)}
+                          className="w-10 bg-[#102A43] border border-slate-700 rounded px-1 py-0.5 text-white text-center text-xs"
+                        />
+                      </div>
 
-                    <button
-                      onClick={() => removeFromCart(item.product.id)}
-                      className="p-1 text-slate-500 hover:text-red-400 transition-colors cursor-pointer"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => removeFromCart(item.product.id)}
+                        className="p-1 text-slate-500 hover:text-red-400 transition-colors cursor-pointer"
+                        title="Sepetten Sil"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Line total summary calculation text */}
+                  <div className="text-[10px] text-slate-400 font-mono bg-slate-900/60 px-2 py-0.5 rounded flex items-center justify-between">
+                    <span>
+                      {item.quantity} {item.product.unit} × {item.unitPrice.toLocaleString('tr-TR')} ₺
+                    </span>
+                    <span className="font-bold text-slate-300">
+                      Toplam: {lineTotal.toLocaleString('tr-TR')} ₺
+                    </span>
                   </div>
                 </div>
               );

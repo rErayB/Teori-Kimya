@@ -19,6 +19,7 @@ import {
 import { StatCard } from '../common/StatCard';
 import { Button } from '../common/Button';
 import { Badge } from '../common/Badge';
+import { PaymentMethod } from '../../types';
 import { repository } from '../../services/storage';
 
 interface DashboardViewProps {
@@ -63,10 +64,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onQuic
     .slice(0, 4);
 
   // Payment type breakdown
-  const paymentTotals = {
+  const paymentTotals: Record<PaymentMethod, number> = {
     cash: 0,
     credit_card: 0,
     open_account: 0,
+    bank_transfer: 0,
   };
   sales.forEach((s) => {
     if (s.status !== 'cancelled') {
@@ -74,7 +76,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onQuic
     }
   });
 
-  const totalPayments = paymentTotals.cash + paymentTotals.credit_card + paymentTotals.open_account || 1;
+  const totalPayments =
+    paymentTotals.cash +
+      paymentTotals.credit_card +
+      paymentTotals.open_account +
+      paymentTotals.bank_transfer || 1;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">

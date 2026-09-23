@@ -4,6 +4,8 @@ import {
   ShoppingCart,
   ShoppingBag,
   Package,
+  PackagePlus,
+  Receipt,
   QrCode,
   Layers,
   FlaskConical,
@@ -19,6 +21,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ShieldAlert,
+  X,
 } from 'lucide-react';
 import { Logo } from '../common/Logo';
 import { UserRole } from '../../types';
@@ -31,6 +34,8 @@ interface SidebarProps {
   userRole: UserRole;
   criticalStockCount: number;
   pendingOrdersCount: number;
+  isMobile?: boolean;
+  onCloseMobile?: () => void;
 }
 
 interface NavItem {
@@ -55,6 +60,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   userRole,
   criticalStockCount,
   pendingOrdersCount,
+  isMobile = false,
+  onCloseMobile,
 }) => {
   // Navigation structure
   const menuSections: MenuSection[] = [
@@ -64,16 +71,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" />, roles: ['admin', 'authorized', 'sales', 'warehouse'] },
         { id: 'pos', label: 'Satış / POS', icon: <ShoppingCart className="w-5 h-5" />, roles: ['admin', 'authorized', 'sales'] },
         { id: 'orders', label: 'Siparişler (B2B)', icon: <ShoppingBag className="w-5 h-5" />, badge: pendingOrdersCount > 0 ? pendingOrdersCount : undefined, roles: ['admin', 'authorized', 'sales'] },
-        { id: 'invoices', label: 'Faturalar', icon: <FileText className="w-5 h-5" />, roles: ['admin', 'authorized', 'sales'] },
+        { id: 'invoices', label: 'Faturalar & İadeler', icon: <FileText className="w-5 h-5" />, roles: ['admin', 'authorized', 'sales'] },
         { id: 'customers', label: 'Müşteriler / Cari', icon: <Users className="w-5 h-5" />, roles: ['admin', 'authorized', 'sales'] },
       ],
     },
     {
-      title: 'ÜRÜN & STOK',
+      title: 'ÜRÜN & STOK GİRİŞİ',
       items: [
+        { id: 'purchases', label: 'Mal Alımı / Stok Girişi', icon: <PackagePlus className="w-5 h-5 text-emerald-400" />, roles: ['admin', 'authorized', 'warehouse'] },
         { id: 'products', label: 'Ürün Yönetimi', icon: <Package className="w-5 h-5" />, roles: ['admin', 'authorized', 'sales', 'warehouse'] },
-        { id: 'barcode', label: 'Barkod / QR', icon: <QrCode className="w-5 h-5" />, roles: ['admin', 'authorized', 'sales', 'warehouse'] },
-        { id: 'stock', label: 'Stok Yönetimi', icon: <Layers className="w-5 h-5" />, badge: criticalStockCount > 0 ? criticalStockCount : undefined, badgeColor: 'bg-red-500', roles: ['admin', 'authorized', 'warehouse'] },
+        { id: 'barcode', label: 'Barkod / Kamera', icon: <QrCode className="w-5 h-5 text-cyan-400" />, roles: ['admin', 'authorized', 'sales', 'warehouse'] },
+        { id: 'stock', label: 'Stok Durumu', icon: <Layers className="w-5 h-5" />, badge: criticalStockCount > 0 ? criticalStockCount : undefined, badgeColor: 'bg-red-500', roles: ['admin', 'authorized', 'warehouse'] },
         { id: 'catalog', label: 'Ürün Kataloğu', icon: <BookOpen className="w-5 h-5" />, roles: ['admin', 'authorized', 'sales', 'warehouse', 'customer'] },
       ],
     },
@@ -83,14 +91,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { id: 'raw_materials', label: 'Hammaddeler', icon: <Beaker className="w-5 h-5" />, roles: ['admin', 'authorized', 'warehouse'] },
         { id: 'production', label: 'Üretim & Parti', icon: <FlaskConical className="w-5 h-5" />, roles: ['admin', 'authorized', 'warehouse'] },
         { id: 'recipes', label: 'Reçeteler', icon: <FlaskConical className="w-5 h-5" />, roles: ['admin', 'authorized', 'warehouse'] },
-        { id: 'suppliers', label: 'Tedarikçiler', icon: <Building2 className="w-5 h-5" />, roles: ['admin', 'authorized', 'warehouse'] },
+        { id: 'suppliers', label: 'Tedarikçiler / Cari', icon: <Building2 className="w-5 h-5" />, roles: ['admin', 'authorized', 'warehouse'] },
         { id: 'adr', label: 'ADR Sevkiyat', icon: <Truck className="w-5 h-5" />, roles: ['admin', 'authorized', 'warehouse'] },
       ],
     },
     {
-      title: 'ANALİTİK & SİSTEM',
+      title: 'FİNANS & GİDERLER',
       items: [
-        { id: 'reports', label: 'Raporlar & Finans', icon: <BarChart3 className="w-5 h-5" />, roles: ['admin', 'authorized'] },
+        { id: 'expenses', label: 'Giderler & Maaş', icon: <Receipt className="w-5 h-5 text-amber-400" />, roles: ['admin', 'authorized'] },
+        { id: 'reports', label: 'Kâr & Nakit Raporu', icon: <BarChart3 className="w-5 h-5 text-cyan-400" />, roles: ['admin', 'authorized'] },
         { id: 'kimyager', label: 'Kimyager AI', icon: <Sparkles className="w-5 h-5 text-cyan-400 animate-pulse" />, roles: ['admin', 'authorized', 'sales', 'warehouse', 'customer'] },
         { id: 'settings', label: 'Ayarlar', icon: <Settings className="w-5 h-5" />, roles: ['admin'] },
       ],
@@ -99,29 +108,41 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <aside
-      className={`relative hidden lg:flex flex-col border-r border-cyan-500/15 bg-gradient-to-b from-[#07111F] via-[#0B1B2E] to-[#07111F] text-slate-100 transition-all duration-300 z-30 select-none ${
-        collapsed ? 'w-20' : 'w-64'
+      className={`relative flex flex-col border-r border-cyan-500/15 bg-gradient-to-b from-[#07111F] via-[#0B1B2E] to-[#07111F] text-slate-100 transition-all duration-300 z-30 select-none ${
+        isMobile ? 'w-full h-full' : collapsed ? 'hidden lg:flex w-20' : 'hidden lg:flex w-64'
       }`}
     >
       {/* Brand Header */}
-      <div className="h-18 flex items-center justify-between px-4 border-b border-cyan-500/15">
-        {!collapsed ? (
+      <div className="h-18 flex items-center justify-between px-4 border-b border-cyan-500/15 shrink-0">
+        {!collapsed || isMobile ? (
           <Logo size="sm" showSubtitle={true} />
         ) : (
           <div className="mx-auto">
             <Logo size="sm" showSubtitle={false} />
           </div>
         )}
+
+        {isMobile && onCloseMobile && (
+          <button
+            onClick={onCloseMobile}
+            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+            aria-label="Menüyü Kapat"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
       </div>
 
-      {/* Collapse Toggle Button */}
-      <button
-        onClick={onToggleCollapse}
-        className="absolute -right-3.5 top-20 w-7 h-7 rounded-full bg-[#102A43] border border-cyan-500/30 text-cyan-300 flex items-center justify-center hover:bg-cyan-500 hover:text-black transition-all shadow-md cursor-pointer z-40"
-        title={collapsed ? 'Genişlet' : 'Daralt'}
-      >
-        {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-      </button>
+      {/* Collapse Toggle Button (Desktop Only) */}
+      {!isMobile && (
+        <button
+          onClick={onToggleCollapse}
+          className="absolute -right-3.5 top-20 w-7 h-7 rounded-full bg-[#102A43] border border-cyan-500/30 text-cyan-300 flex items-center justify-center hover:bg-cyan-500 hover:text-black transition-all shadow-md cursor-pointer z-40"
+          title={collapsed ? 'Genişlet' : 'Daralt'}
+        >
+          {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+        </button>
+      )}
 
       {/* Navigation List */}
       <div className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
@@ -132,7 +153,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           return (
             <div key={sIdx} className="space-y-1">
-              {!collapsed && (
+              {(!collapsed || isMobile) && (
                 <p className="px-3 text-[10px] font-extrabold tracking-wider text-cyan-400/60 uppercase">
                   {section.title}
                 </p>

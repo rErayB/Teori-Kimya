@@ -88,7 +88,7 @@ export interface StockMovement {
   date: string;
 }
 
-export type PaymentMethod = 'cash' | 'credit_card' | 'open_account';
+export type PaymentMethod = 'cash' | 'credit_card' | 'open_account' | 'bank_transfer';
 
 export interface CartItem {
   product: Product;
@@ -130,6 +130,113 @@ export interface Sale {
   status: 'completed' | 'cancelled';
   notes?: string;
   cashierName: string;
+}
+
+export interface Purchase {
+  id: string;
+  purchaseNo: string;
+  date: string;
+  productId: string;
+  productName: string;
+  productBarcode?: string;
+  supplierId?: string;
+  supplierName: string;
+  quantity: number;
+  unit: string;
+  costPerUnit: number;
+  totalCost: number;
+  invoiceNo?: string;
+  paymentStatus: 'paid' | 'unpaid' | 'partial';
+  paymentMethod: 'cash' | 'bank_transfer' | 'term_account';
+  notes?: string;
+  receivedBy: string;
+  createdAt: string;
+}
+
+export type ExpenseCategory =
+  | 'Kira'
+  | 'Maaş'
+  | 'Elektrik'
+  | 'Su'
+  | 'Doğalgaz'
+  | 'İnternet'
+  | 'Telefon'
+  | 'Araç'
+  | 'Yakıt'
+  | 'Kargo'
+  | 'Nakliye'
+  | 'Reklam'
+  | 'Vergi'
+  | 'Muhasebe'
+  | 'Bakım'
+  | 'Personel'
+  | 'Ofis giderleri'
+  | 'Diğer'
+  | string;
+
+export interface Expense {
+  id: string;
+  title: string;
+  category: ExpenseCategory;
+  amount: number;
+  date: string;
+  paymentMethod: 'cash' | 'credit_card' | 'bank_transfer';
+  recipientOrCompany?: string;
+  documentNo?: string;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface Staff {
+  id: string;
+  fullName: string;
+  role: string;
+  phone: string;
+  monthlySalary: number;
+  paymentDay: number;
+  active: boolean;
+  notes?: string;
+}
+
+export interface SalaryPayment {
+  id: string;
+  staffId: string;
+  staffName: string;
+  date: string;
+  month: string; // '2026-09'
+  salaryAmount: number;
+  paidAmount: number;
+  remainingAmount: number;
+  paymentMethod: 'cash' | 'bank_transfer';
+  notes?: string;
+  createdAt: string;
+}
+
+export interface ProductReturn {
+  id: string;
+  returnNo: string;
+  date: string;
+  customerId?: string;
+  customerName: string;
+  productId: string;
+  productName: string;
+  quantity: number;
+  unit: string;
+  refundAmount: number;
+  reason: string;
+  returnToStock: boolean;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface SupplierTransaction {
+  id: string;
+  date: string;
+  type: 'purchase' | 'payment' | 'adjustment';
+  amount: number;
+  description: string;
+  documentNo?: string;
+  balanceAfter: number;
 }
 
 export type OrderStatus = 'draft' | 'pending' | 'approved' | 'preparing' | 'shipped' | 'delivered' | 'cancelled';
@@ -206,6 +313,7 @@ export interface Supplier {
   currentBalance?: number;
   active?: boolean;
   notes?: string;
+  transactions?: SupplierTransaction[];
 }
 
 export interface RawMaterial {
@@ -290,10 +398,22 @@ export interface DashboardMetrics {
   monthRevenue: number;
   todaySalesCount: number;
   monthSalesCount: number;
+  totalCostMonth: number;
   grossProfitMonth: number;
+  totalExpensesMonth: number;
+  netProfitMonth: number;
   profitMarginMonth: number;
   totalStockValue: number;
   criticalStockCount: number;
+  lowStockCount: number;
+  outOfStockCount: number;
   totalReceivables: number;
+  totalPayables: number;
   pendingOrdersCount: number;
+  paymentBreakdown: {
+    cash: number;
+    creditCard: number;
+    openAccount: number;
+    bankTransfer: number;
+  };
 }

@@ -27,7 +27,26 @@ export const StockView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'status' | 'movements'>('status');
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'in_stock' | 'low_stock' | 'out_of_stock'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'normal' | 'low' | 'critical' | 'out_of_stock'>('all');
+  const [notificationToast, setNotificationToast] = useState<string | null>(null);
+
+  // Helper for 4-level classification (Requirement 17)
+  const getStockStatus = (p: Product): 'out_of_stock' | 'critical' | 'low' | 'normal' => {
+    if (p.stock <= 0) return 'out_of_stock';
+    if (p.stock <= p.minStock) return 'critical';
+    if (p.stock <= p.minStock * 1.5) return 'low';
+    return 'normal';
+  };
+
+  const handleSendStockAlert = (p: Product) => {
+    repository.addNotification({
+      title: `Stok Uyarısı: ${p.name}`,
+      message: `${p.name} stoğu ${p.stock} ${p.unit} seviyesine geriledi (Min. eşik: ${p.minStock} ${p.unit}). Acil mal alımı veya üretim planlaması gereklidir.`,
+      type: 'warning',
+      linkTab: 'stock',
+    });
+    setNotificationToast(`"${p.name}" için stok azaldı bildirimi sisteme ve bildirim merkezine gönderildi.`);
+  };
 
   // Adjustment modal
   const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
@@ -114,9 +133,11 @@ export const StockView: React.FC = () => {
       !q || p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q) || p.barcode.includes(q);
 
     let matchesStatus = true;
-    if (statusFilter === 'in_stock') matchesStatus = p.stock > p.minStock;
-    if (statusFilter === 'low_stock') matchesStatus = p.stock > 0 && p.stock <= p.minStock;
-    if (statusFilter === 'out_of_stock') matchesStatus = p.stock <= 0;
+    const status = getStockStatus(p);
+    if (statusFilter === 'out_of_stock') matchesStatus = status === 'out_of_stock';
+    else if (statusFilter === 'critical') matchesStatus = status === 'critical';
+    else if (statusFilter === 'low') matchesStatus = status === 'low';
+    else if (statusFilter === 'normal') matchesStatus = status === 'normal';
 
     return matchesSearch && matchesStatus;
   });
@@ -178,7 +199,7 @@ export const StockView: React.FC = () => {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setStatusFilter('low_stock')}
+              onClick={() => setStatusFilter('critical')}
               className="px-3 py-1.5 rounded-xl bg-amber-600/30 hover:bg-amber-600/50 border border-amber-400/40 text-amber-300 text-xs font-semibold cursor-pointer"
             >
               Kritikleri Filtrele
@@ -203,7 +224,7 @@ export const StockView: React.FC = () => {
               />
             </div>
 
-            <div className="flex items-center gap-1.5 text-xs">
+            <div className="flex flex-wrap items-center gap-1.5 text-xs">
               <button
                 onClick={() => setStatusFilter('all')}
                 className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
@@ -215,24 +236,34 @@ export const StockView: React.FC = () => {
                 Tümü ({products.length})
               </button>
               <button
-                onClick={() => setStatusFilter('in_stock')}
+                onClick={() => setStatusFilter('normal')}
                 className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
-                  statusFilter === 'in_stock'
+                  statusFilter === 'normal'
                     ? 'bg-emerald-600 text-white font-bold'
                     : 'bg-[#102A43] text-slate-300 hover:text-white'
                 }`}
               >
-                Stokta
+                Normal
               </button>
               <button
-                onClick={() => setStatusFilter('low_stock')}
+                onClick={() => setStatusFilter('low')}
                 className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
-                  statusFilter === 'low_stock'
+                  statusFilter === 'low'
                     ? 'bg-amber-600 text-white font-bold'
                     : 'bg-[#102A43] text-slate-300 hover:text-white'
                 }`}
               >
-                Az Stok ({criticalProducts.length})
+                Az
+              </button>
+              <button
+                onClick={() => setStatusFilter('critical')}
+                className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                  statusFilter === 'critical'
+                    ? 'bg-rose-600 text-white font-bold'
+                    : 'bg-[#102A43] text-slate-300 hover:text-white'
+                }`}
+              >
+                Kritik ({criticalProducts.length})
               </button>
               <button
                 onClick={() => setStatusFilter('out_of_stock')}
@@ -242,10 +273,25 @@ export const StockView: React.FC = () => {
                     : 'bg-[#102A43] text-slate-300 hover:text-white'
                 }`}
               >
-                Tükenen
+                Tükendi
               </button>
             </div>
           </div>
+
+          {notificationToast && (
+            <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-500/40 text-amber-200 text-xs flex items-center justify-between animate-in fade-in">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-amber-400" />
+                <span>{notificationToast}</span>
+              </div>
+              <button
+                onClick={() => setNotificationToast(null)}
+                className="text-amber-400 font-bold hover:underline cursor-pointer"
+              >
+                Kapat
+              </button>
+            </div>
+          )}
 
           {/* Table */}
           <div className="rounded-2xl bg-[#0B1B2E] border border-cyan-500/20 shadow-xl overflow-hidden">
@@ -254,86 +300,107 @@ export const StockView: React.FC = () => {
                 <thead>
                   <tr className="border-b border-cyan-500/20 bg-[#102A43]/60 text-slate-300 font-bold uppercase tracking-wider text-[11px]">
                     <th className="py-3 px-4">Ürün Bilgisi</th>
-                    <th className="py-3 px-4">Raf Lokasyonu</th>
+                    <th className="py-3 px-4">Kategori / Depo</th>
                     <th className="py-3 px-4 text-center">Birim</th>
                     <th className="py-3 px-4 text-center">Mevcut Stok</th>
                     <th className="py-3 px-4 text-center">Min. Eşik</th>
-                    <th className="py-3 px-4 text-center">Durum Etiketi</th>
+                    <th className="py-3 px-4 text-center">Stok Durumu</th>
                     <th className="py-3 px-4 text-right">Stok Değeri</th>
                     <th className="py-3 px-4 text-right">İşlem</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/80">
-                  {filteredProducts.map((p) => {
-                    const isOut = p.stock <= 0;
-                    const isLow = p.stock > 0 && p.stock <= p.minStock;
-                    const stockValue = p.stock * p.purchasePrice;
+                  {filteredProducts
+                    .filter((p) => {
+                      if (statusFilter === 'all') return true;
+                      return getStockStatus(p) === statusFilter;
+                    })
+                    .map((p) => {
+                      const st = getStockStatus(p);
+                      const stockValue = p.stock * p.purchasePrice;
 
-                    return (
-                      <tr key={p.id} className="hover:bg-[#102A43]/40 transition-colors">
-                        <td className="py-3 px-4">
-                          <span className="font-mono text-cyan-300 font-bold text-xs">{p.code}</span>
-                          <p className="font-bold text-white text-xs">{p.name}</p>
-                          <span className="text-[10px] text-slate-400 font-mono">{p.barcode}</span>
-                        </td>
+                      return (
+                        <tr key={p.id} className="hover:bg-[#102A43]/40 transition-colors">
+                          <td className="py-3 px-4">
+                            <span className="font-mono text-cyan-300 font-bold text-xs">{p.code}</span>
+                            <p className="font-bold text-white text-xs">{p.name}</p>
+                            <span className="text-[10px] text-slate-400 font-mono">{p.barcode}</span>
+                          </td>
 
-                        <td className="py-3 px-4 font-mono text-slate-300">
-                          {p.category}
-                        </td>
+                          <td className="py-3 px-4 font-mono text-slate-300">
+                            {p.category}
+                          </td>
 
-                        <td className="py-3 px-4 text-center text-slate-300">{p.unit}</td>
+                          <td className="py-3 px-4 text-center text-slate-300">{p.unit}</td>
 
-                        <td className="py-3 px-4 text-center font-black text-sm">
-                          <span
-                            className={
-                              isOut
-                                ? 'text-red-400'
-                                : isLow
-                                ? 'text-amber-300'
-                                : 'text-emerald-400'
-                            }
-                          >
-                            {p.stock}
-                          </span>
-                        </td>
-
-                        <td className="py-3 px-4 text-center text-slate-400 font-mono">
-                          {p.minStock}
-                        </td>
-
-                        <td className="py-3 px-4 text-center">
-                          {isOut ? (
-                            <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-red-500/20 text-red-400 border border-red-500/40">
-                              STOK YOK
+                          <td className="py-3 px-4 text-center font-black text-sm">
+                            <span
+                              className={
+                                st === 'out_of_stock'
+                                  ? 'text-red-400'
+                                  : st === 'critical'
+                                  ? 'text-rose-400'
+                                  : st === 'low'
+                                  ? 'text-amber-300'
+                                  : 'text-emerald-400'
+                              }
+                            >
+                              {p.stock}
                             </span>
-                          ) : isLow ? (
-                            <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/40">
-                              AZ STOK
-                            </span>
-                          ) : (
-                            <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                              STOKTA
-                            </span>
-                          )}
-                        </td>
+                          </td>
 
-                        <td className="py-3 px-4 text-right font-mono text-slate-300">
-                          {stockValue.toLocaleString('tr-TR')} ₺
-                        </td>
+                          <td className="py-3 px-4 text-center text-slate-400 font-mono">
+                            {p.minStock}
+                          </td>
 
-                        <td className="py-3 px-4 text-right">
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => handleOpenAdjust(p)}
-                            icon={<RefreshCw className="w-3.5 h-3.5 text-cyan-400" />}
-                          >
-                            Düzeltme Yap
-                          </Button>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                          <td className="py-3 px-4 text-center">
+                            {st === 'out_of_stock' ? (
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-red-950 text-red-400 border border-red-500/40">
+                                TÜKENDİ
+                              </span>
+                            ) : st === 'critical' ? (
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-rose-950 text-rose-300 border border-rose-500/40 animate-pulse">
+                                KRİTİK
+                              </span>
+                            ) : st === 'low' ? (
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-950 text-amber-300 border border-amber-500/40">
+                                AZ
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-950/60 text-emerald-300 border border-emerald-500/40">
+                                NORMAL
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="py-3 px-4 text-right font-mono text-slate-300">
+                            {stockValue.toLocaleString('tr-TR')} ₺
+                          </td>
+
+                          <td className="py-3 px-4 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {(st === 'critical' || st === 'low' || st === 'out_of_stock') && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleSendStockAlert(p)}
+                                  className="px-2 py-1 rounded-lg text-[10px] font-bold bg-amber-950/60 hover:bg-amber-900 border border-amber-500/40 text-amber-300 transition-colors cursor-pointer"
+                                  title="Stok azaldı bildirimi oluştur"
+                                >
+                                  Bildir
+                                </button>
+                              )}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleOpenAdjust(p)}
+                              >
+                                Düzelt
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                 </tbody>
               </table>
             </div>

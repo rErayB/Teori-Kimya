@@ -8,6 +8,7 @@ interface ModalProps {
   subtitle?: string;
   children: React.ReactNode;
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '4xl' | 'full';
+  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '4xl' | 'full';
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -16,8 +17,10 @@ export const Modal: React.FC<ModalProps> = ({
   title,
   subtitle,
   children,
-  maxWidth = 'lg',
+  maxWidth,
+  size,
 }) => {
+  const effectiveMaxWidth = size || maxWidth || 'lg';
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
@@ -52,7 +55,7 @@ export const Modal: React.FC<ModalProps> = ({
       onClick={onClose}
     >
       <div
-        className={`relative w-full ${maxWidthStyles[maxWidth]} my-auto overflow-hidden rounded-2xl bg-[#0B1B2E] border border-cyan-500/25 shadow-2xl shadow-black/80 flex flex-col max-h-[92vh] text-slate-100 animate-in zoom-in-95 duration-150`}
+        className={`relative w-full ${maxWidthStyles[effectiveMaxWidth]} my-auto overflow-hidden rounded-2xl bg-[#0B1B2E] border border-cyan-500/25 shadow-2xl shadow-black/80 flex flex-col max-h-[92vh] text-slate-100 animate-in zoom-in-95 duration-150`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}

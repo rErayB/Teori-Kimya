@@ -13,6 +13,13 @@ import {
   UserRole,
   PaymentMethod,
   OrderStatus,
+  Purchase,
+  Expense,
+  Staff,
+  SalaryPayment,
+  ProductReturn,
+  SupplierTransaction,
+  DashboardMetrics,
 } from '../types';
 
 export const INITIAL_COMPANY: CompanyInfo = {
@@ -1014,6 +1021,226 @@ export const INITIAL_NOTIFICATIONS: AppNotification[] = [
   },
 ];
 
+export const INITIAL_PURCHASES: Purchase[] = [
+  {
+    id: 'pur-1',
+    purchaseNo: 'ALIS-2026-0001',
+    date: '2026-09-20T10:00:00.000Z',
+    productId: 'prod-1',
+    productName: 'TK-100 Ağır Kir & Yağ Sökücü Endüstriyel',
+    productBarcode: '8680001201015',
+    supplierId: 'sup-1',
+    supplierName: 'Akkim Kimya Sanayi ve Tic. A.Ş.',
+    quantity: 40,
+    unit: 'Bidon (20L)',
+    costPerUnit: 420.00,
+    totalCost: 16800.00,
+    invoiceNo: 'AKK-2026-4412',
+    paymentStatus: 'paid',
+    paymentMethod: 'bank_transfer',
+    notes: '2. Parti fabrika alımı',
+    receivedBy: 'Mehmet Bozkurt',
+    createdAt: '2026-09-20T10:00:00.000Z',
+  },
+  {
+    id: 'pur-2',
+    purchaseNo: 'ALIS-2026-0002',
+    date: '2026-09-21T14:30:00.000Z',
+    productId: 'prod-2',
+    productName: 'TK-200 Süper Köpüklü Cilalı Oto Şampuanı',
+    productBarcode: '8680001201022',
+    supplierId: 'sup-1',
+    supplierName: 'Akkim Kimya Sanayi ve Tic. A.Ş.',
+    quantity: 30,
+    unit: 'Bidon (20L)',
+    costPerUnit: 260.00,
+    totalCost: 7800.00,
+    invoiceNo: 'AKK-2026-4439',
+    paymentStatus: 'paid',
+    paymentMethod: 'bank_transfer',
+    notes: 'Oto bakım serisi stok takviyesi',
+    receivedBy: 'Mehmet Bozkurt',
+    createdAt: '2026-09-21T14:30:00.000Z',
+  },
+  {
+    id: 'pur-3',
+    purchaseNo: 'ALIS-2026-0003',
+    date: '2026-09-22T11:15:00.000Z',
+    productId: 'prod-4',
+    productName: 'TK-400 Kireç ve Pas Çözücü Ağır Asidik',
+    productBarcode: '8680001201046',
+    supplierId: 'sup-2',
+    supplierName: 'Koruma Klor Alkali San. ve Tic. A.Ş.',
+    quantity: 25,
+    unit: 'Bidon (20L)',
+    costPerUnit: 450.00,
+    totalCost: 11250.00,
+    invoiceNo: 'KOR-2026-8910',
+    paymentStatus: 'unpaid',
+    paymentMethod: 'term_account',
+    notes: 'Asidik hammadde bazlı parti alımı',
+    receivedBy: 'Mehmet Bozkurt',
+    createdAt: '2026-09-22T11:15:00.000Z',
+  }
+];
+
+export const INITIAL_EXPENSES: Expense[] = [
+  {
+    id: 'exp-1',
+    title: 'Fabrika & Depo Kira Bedeli (Eylül 2026)',
+    category: 'Kira',
+    amount: 35000.00,
+    date: '2026-09-05T09:00:00.000Z',
+    paymentMethod: 'bank_transfer',
+    recipientOrCompany: 'Avcılar İşhanı Yönetimi / Mülk Sahibi',
+    documentNo: 'DEK-2026-09-01',
+    notes: 'Eylül ayı fabrika ve merkez depo kira ödemesi',
+    createdAt: '2026-09-05T09:00:00.000Z',
+  },
+  {
+    id: 'exp-2',
+    title: 'OEDAŞ Fabrika Elektrik Faturası',
+    category: 'Elektrik',
+    amount: 14250.00,
+    date: '2026-09-12T11:00:00.000Z',
+    paymentMethod: 'bank_transfer',
+    recipientOrCompany: 'Osmangazi Elektrik Dağıtım A.Ş.',
+    documentNo: 'FAT-OED-2026-891',
+    notes: 'Reaktör ve mikser trafo tüketimi',
+    createdAt: '2026-09-12T11:00:00.000Z',
+  },
+  {
+    id: 'exp-3',
+    title: 'Sevkiyat Kamyoneti Mazot & Taşıt Yakıtı',
+    category: 'Yakıt',
+    amount: 6800.00,
+    date: '2026-09-18T16:30:00.000Z',
+    paymentMethod: 'credit_card',
+    recipientOrCompany: 'Petrol Ofisi Kütahya İstasyonu',
+    documentNo: 'FIS-PO-4482',
+    notes: 'Eskişehir - Uşak bayi teslimat rotası mazot gideri',
+    createdAt: '2026-09-18T16:30:00.000Z',
+  },
+  {
+    id: 'exp-4',
+    title: 'Kurumsal Fiber İnternet Faturası',
+    category: 'İnternet',
+    amount: 1450.00,
+    date: '2026-09-15T10:00:00.000Z',
+    paymentMethod: 'bank_transfer',
+    recipientOrCompany: 'Türk Telekom A.Ş.',
+    documentNo: 'TT-2026-98124',
+    notes: 'Ofis ve laboratuvar sabit internet',
+    createdAt: '2026-09-15T10:00:00.000Z',
+  },
+  {
+    id: 'exp-5',
+    title: 'Laboratuvar Kalibrasyon & Kimyasal Analiz Raporları',
+    category: 'Bakım',
+    amount: 7500.00,
+    date: '2026-09-10T14:00:00.000Z',
+    paymentMethod: 'bank_transfer',
+    recipientOrCompany: 'TÜBİTAK MAM / Akredite Lab A.Ş.',
+    documentNo: 'FAT-LAB-2026-110',
+    notes: 'TSE ve Sağlık Bakanlığı biyosidal kontrol numune testi',
+    createdAt: '2026-09-10T14:00:00.000Z',
+  }
+];
+
+export const INITIAL_STAFF: Staff[] = [
+  {
+    id: 'stf-1',
+    fullName: 'Mehmet Bozkurt',
+    role: 'Satış Danışmanı & Saha Sorumlusu',
+    phone: '+90 544 214 5940',
+    monthlySalary: 42000.00,
+    paymentDay: 1,
+    active: true,
+    notes: 'Müşteri ziyaretleri ve saha teslimat koordinasyonu',
+  },
+  {
+    id: 'stf-2',
+    fullName: 'Ahmet Karataş',
+    role: 'Baş Kimyager & Üretim Sorumlusu',
+    phone: '+90 532 441 8890',
+    monthlySalary: 48000.00,
+    paymentDay: 1,
+    active: true,
+    notes: 'Reaktör sentez, formülasyon ve kalite kontrol sorumlusu',
+  },
+  {
+    id: 'stf-3',
+    fullName: 'Mustafa Yıldız',
+    role: 'Depo & ADR Sevkiyat Operatörü',
+    phone: '+90 535 712 3344',
+    monthlySalary: 32000.00,
+    paymentDay: 1,
+    active: true,
+    notes: 'Forklift operatörü ve tehlikeli madde yükleme',
+  },
+];
+
+export const INITIAL_SALARY_PAYMENTS: SalaryPayment[] = [
+  {
+    id: 'sal-1',
+    staffId: 'stf-1',
+    staffName: 'Mehmet Bozkurt',
+    date: '2026-09-01T10:00:00.000Z',
+    month: '2026-09',
+    salaryAmount: 42000.00,
+    paidAmount: 42000.00,
+    remainingAmount: 0,
+    paymentMethod: 'bank_transfer',
+    notes: 'Eylül 2026 maaş ödemesi',
+    createdAt: '2026-09-01T10:00:00.000Z',
+  },
+  {
+    id: 'sal-2',
+    staffId: 'stf-2',
+    staffName: 'Ahmet Karataş',
+    date: '2026-09-01T10:15:00.000Z',
+    month: '2026-09',
+    salaryAmount: 48000.00,
+    paidAmount: 48000.00,
+    remainingAmount: 0,
+    paymentMethod: 'bank_transfer',
+    notes: 'Eylül 2026 maaş ödemesi',
+    createdAt: '2026-09-01T10:15:00.000Z',
+  },
+  {
+    id: 'sal-3',
+    staffId: 'stf-3',
+    staffName: 'Mustafa Yıldız',
+    date: '2026-09-01T10:30:00.000Z',
+    month: '2026-09',
+    salaryAmount: 32000.00,
+    paidAmount: 32000.00,
+    remainingAmount: 0,
+    paymentMethod: 'bank_transfer',
+    notes: 'Eylül 2026 maaş ödemesi',
+    createdAt: '2026-09-01T10:30:00.000Z',
+  },
+];
+
+export const INITIAL_PRODUCT_RETURNS: ProductReturn[] = [
+  {
+    id: 'ret-1',
+    returnNo: 'IADE-2026-0001',
+    date: '2026-09-18T14:20:00.000Z',
+    customerId: 'cust-2',
+    customerName: 'Dumlupınar Lojistik & Antrepo Hizmetleri Ltd. Şti.',
+    productId: 'prod-2',
+    productName: 'TK-200 Süper Köpüklü Cilalı Oto Şampuanı',
+    quantity: 2,
+    unit: 'Bidon (20L)',
+    refundAmount: 960.00,
+    reason: 'Fazla sipariş verilmiş kapalı ambalaj iadesi',
+    returnToStock: true,
+    notes: 'Kapağı açılmamış, kontrol edilerek depoya alındı',
+    createdAt: '2026-09-18T14:20:00.000Z',
+  }
+];
+
 // LocalStorage Keys
 const KEYS = {
   COMPANY: 'teori_kimya_company_v2',
@@ -1028,6 +1255,11 @@ const KEYS = {
   PRODUCTIONS: 'teori_kimya_productions_v2',
   NOTIFICATIONS: 'teori_kimya_notifications_v2',
   ACTIVE_ROLE: 'teori_kimya_role_v2',
+  PURCHASES: 'teori_kimya_purchases_v2',
+  EXPENSES: 'teori_kimya_expenses_v2',
+  STAFF: 'teori_kimya_staff_v2',
+  SALARY_PAYMENTS: 'teori_kimya_salary_payments_v2',
+  PRODUCT_RETURNS: 'teori_kimya_product_returns_v2',
 };
 
 // Safe JSON loader
@@ -1064,6 +1296,11 @@ export class TeoriKimyaRepository {
   private productions: ProductionOrder[];
   private notifications: AppNotification[];
   private currentRole: UserRole;
+  private purchases: Purchase[];
+  private expenses: Expense[];
+  private staff: Staff[];
+  private salaryPayments: SalaryPayment[];
+  private productReturns: ProductReturn[];
   private listeners: (() => void)[] = [];
 
   constructor() {
@@ -1079,6 +1316,11 @@ export class TeoriKimyaRepository {
     this.productions = loadFromStorage(KEYS.PRODUCTIONS, INITIAL_PRODUCTION_ORDERS);
     this.notifications = loadFromStorage(KEYS.NOTIFICATIONS, INITIAL_NOTIFICATIONS);
     this.currentRole = loadFromStorage<UserRole>(KEYS.ACTIVE_ROLE, 'admin');
+    this.purchases = loadFromStorage(KEYS.PURCHASES, INITIAL_PURCHASES);
+    this.expenses = loadFromStorage(KEYS.EXPENSES, INITIAL_EXPENSES);
+    this.staff = loadFromStorage(KEYS.STAFF, INITIAL_STAFF);
+    this.salaryPayments = loadFromStorage(KEYS.SALARY_PAYMENTS, INITIAL_SALARY_PAYMENTS);
+    this.productReturns = loadFromStorage(KEYS.PRODUCT_RETURNS, INITIAL_PRODUCT_RETURNS);
   }
 
   // Subscribe to changes
@@ -1912,18 +2154,7 @@ export class TeoriKimyaRepository {
   }
 
   // Dashboard Metrics Calculation from real records
-  getDashboardMetrics(): {
-    todayRevenue: number;
-    monthRevenue: number;
-    todaySalesCount: number;
-    monthSalesCount: number;
-    grossProfitMonth: number;
-    profitMarginMonth: number;
-    totalStockValue: number;
-    criticalStockCount: number;
-    totalReceivables: number;
-    pendingOrdersCount: number;
-  } {
+  getDashboardMetrics(): DashboardMetrics {
     const todayStr = new Date().toISOString().split('T')[0];
     const currentMonthStr = todayStr.substring(0, 7); // "2026-09"
 
@@ -1931,7 +2162,15 @@ export class TeoriKimyaRepository {
     let monthRevenue = 0;
     let todaySalesCount = 0;
     let monthSalesCount = 0;
+    let totalCostMonth = 0;
     let grossProfitMonth = 0;
+
+    const paymentBreakdown = {
+      cash: 0,
+      creditCard: 0,
+      openAccount: 0,
+      bankTransfer: 0,
+    };
 
     for (const sale of this.sales) {
       if (sale.status === 'cancelled') continue;
@@ -1946,21 +2185,43 @@ export class TeoriKimyaRepository {
       if (saleMonthStr === currentMonthStr) {
         monthRevenue += sale.grandTotal;
         monthSalesCount += 1;
+        totalCostMonth += sale.totalCost;
         grossProfitMonth += sale.totalProfit;
+
+        if (sale.paymentMethod === 'cash') paymentBreakdown.cash += sale.grandTotal;
+        else if (sale.paymentMethod === 'credit_card') paymentBreakdown.creditCard += sale.grandTotal;
+        else if (sale.paymentMethod === 'open_account') paymentBreakdown.openAccount += sale.grandTotal;
+        else if (sale.paymentMethod === 'bank_transfer') paymentBreakdown.bankTransfer += sale.grandTotal;
       }
     }
 
+    // Monthly expenses
+    let totalExpensesMonth = 0;
+    for (const exp of this.expenses) {
+      const expMonth = exp.date.substring(0, 7);
+      if (expMonth === currentMonthStr) {
+        totalExpensesMonth += exp.amount;
+      }
+    }
+
+    const netProfitMonth = grossProfitMonth - totalExpensesMonth;
     const profitMarginMonth = monthRevenue > 0 ? (grossProfitMonth / monthRevenue) * 100 : 0;
 
-    // Total Stock Value (At purchase cost)
+    // Total Stock Value & stock status counts
     let totalStockValue = 0;
     let criticalStockCount = 0;
+    let lowStockCount = 0;
+    let outOfStockCount = 0;
 
     for (const prod of this.products) {
       if (prod.active) {
         totalStockValue += prod.stock * prod.purchasePrice;
-        if (prod.stock <= prod.minStock) {
+        if (prod.stock <= 0) {
+          outOfStockCount += 1;
+        } else if (prod.stock <= prod.minStock) {
           criticalStockCount += 1;
+        } else if (prod.stock <= prod.minStock * 1.5) {
+          lowStockCount += 1;
         }
       }
     }
@@ -1970,6 +2231,14 @@ export class TeoriKimyaRepository {
     for (const cust of this.customers) {
       if (cust.balance > 0) {
         totalReceivables += cust.balance;
+      }
+    }
+
+    // Total Payables (Tedarikçi Borçları)
+    let totalPayables = 0;
+    for (const sup of this.suppliers) {
+      if (sup.balance > 0) {
+        totalPayables += sup.balance;
       }
     }
 
@@ -1983,12 +2252,443 @@ export class TeoriKimyaRepository {
       monthRevenue: Number(monthRevenue.toFixed(2)),
       todaySalesCount,
       monthSalesCount,
+      totalCostMonth: Number(totalCostMonth.toFixed(2)),
       grossProfitMonth: Number(grossProfitMonth.toFixed(2)),
+      totalExpensesMonth: Number(totalExpensesMonth.toFixed(2)),
+      netProfitMonth: Number(netProfitMonth.toFixed(2)),
       profitMarginMonth: Number(profitMarginMonth.toFixed(1)),
       totalStockValue: Number(totalStockValue.toFixed(2)),
       criticalStockCount,
+      lowStockCount,
+      outOfStockCount,
       totalReceivables: Number(totalReceivables.toFixed(2)),
+      totalPayables: Number(totalPayables.toFixed(2)),
       pendingOrdersCount,
+      paymentBreakdown: {
+        cash: Number(paymentBreakdown.cash.toFixed(2)),
+        creditCard: Number(paymentBreakdown.creditCard.toFixed(2)),
+        openAccount: Number(paymentBreakdown.openAccount.toFixed(2)),
+        bankTransfer: Number(paymentBreakdown.bankTransfer.toFixed(2)),
+      },
+    };
+  }
+
+  // Purchases / Mal Alımı
+  getPurchases(): Purchase[] {
+    return [...this.purchases];
+  }
+
+  addPurchase(params: {
+    productId: string;
+    quantity: number;
+    costPerUnit: number;
+    supplierId?: string;
+    supplierName?: string;
+    invoiceNo?: string;
+    paymentStatus?: 'paid' | 'unpaid' | 'partial';
+    paymentMethod?: 'cash' | 'bank_transfer' | 'term_account';
+    notes?: string;
+    date?: string;
+    receivedBy?: string;
+  }): { success: boolean; error?: string; purchase?: Purchase } {
+    const product = this.products.find((p) => p.id === params.productId);
+    if (!product) return { success: false, error: 'Ürün bulunamadı!' };
+    if (params.quantity <= 0) return { success: false, error: 'Alış miktarı 0 dan büyük olmalıdır!' };
+    if (params.costPerUnit < 0) return { success: false, error: 'Birim maliyet negatif olamaz!' };
+
+    const previousStock = product.stock;
+    const newStock = previousStock + params.quantity;
+    const totalCost = Number((params.quantity * params.costPerUnit).toFixed(2));
+
+    // Weighted average cost calculation
+    const previousTotalValue = previousStock * product.purchasePrice;
+    const newTotalValue = previousTotalValue + totalCost;
+    const weightedCost = newStock > 0 ? Number((newTotalValue / newStock).toFixed(2)) : params.costPerUnit;
+
+    product.stock = newStock;
+    product.purchasePrice = weightedCost;
+    product.profitAmount = Number((product.salePrice - product.purchasePrice).toFixed(2));
+    product.profitMargin = product.salePrice > 0 ? Number(((product.profitAmount / product.salePrice) * 100).toFixed(1)) : 0;
+    product.updatedAt = new Date().toISOString();
+    saveToStorage(KEYS.PRODUCTS, this.products);
+
+    const purchaseNo = `ALIS-2026-${String(this.purchases.length + 101).padStart(4, '0')}`;
+    const date = params.date || new Date().toISOString();
+
+    const newPurchase: Purchase = {
+      id: `pur-${Date.now()}`,
+      purchaseNo,
+      date,
+      productId: product.id,
+      productName: product.name,
+      productBarcode: product.barcode,
+      supplierId: params.supplierId,
+      supplierName: params.supplierName || 'Genel Tedarikçi',
+      quantity: params.quantity,
+      unit: product.unit,
+      costPerUnit: params.costPerUnit,
+      totalCost,
+      invoiceNo: params.invoiceNo,
+      paymentStatus: params.paymentStatus || 'paid',
+      paymentMethod: params.paymentMethod || 'bank_transfer',
+      notes: params.notes,
+      receivedBy: params.receivedBy || this.company.contactPerson,
+      createdAt: new Date().toISOString(),
+    };
+
+    this.purchases.unshift(newPurchase);
+    saveToStorage(KEYS.PURCHASES, this.purchases);
+
+    // Stock movement log
+    this.addStockMovement({
+      productId: product.id,
+      productName: product.name,
+      type: 'purchase_entry',
+      quantity: params.quantity,
+      unit: product.unit,
+      previousStock,
+      newStock,
+      referenceId: purchaseNo,
+      notes: `Mal Alımı / Fatura: ${params.invoiceNo || purchaseNo} (${newPurchase.supplierName})`,
+      performedBy: newPurchase.receivedBy,
+    });
+
+    // If supplier selected and not paid / term account, add to supplier balance
+    if (params.supplierId) {
+      const supplier = this.suppliers.find((s) => s.id === params.supplierId);
+      if (supplier) {
+        if (!supplier.transactions) supplier.transactions = [];
+        if (params.paymentStatus !== 'paid') {
+          supplier.balance = Number((supplier.balance + totalCost).toFixed(2));
+          supplier.currentBalance = supplier.balance;
+          supplier.transactions.unshift({
+            id: `stx-${Date.now()}`,
+            date,
+            type: 'purchase',
+            amount: totalCost,
+            description: `Mal Alımı: ${purchaseNo} (${product.name} x ${params.quantity})`,
+            documentNo: params.invoiceNo || purchaseNo,
+            balanceAfter: supplier.balance,
+          });
+        }
+        saveToStorage(KEYS.SUPPLIERS, this.suppliers);
+      }
+    }
+
+    this.addNotification({
+      title: 'Stok Girişi Yapıldı',
+      message: `${product.name} için ${params.quantity} ${product.unit} stok eklendi. Toplam maliyet: ${totalCost.toLocaleString('tr-TR')} ₺`,
+      type: 'success',
+      linkTab: 'stock',
+    });
+
+    this.notify();
+    return { success: true, purchase: newPurchase };
+  }
+
+  // Expenses / İşletme Giderleri
+  getExpenses(): Expense[] {
+    return [...this.expenses];
+  }
+
+  addExpense(data: Omit<Expense, 'id' | 'createdAt'>): { success: boolean; expense: Expense } {
+    const newExpense: Expense = {
+      ...data,
+      id: `exp-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+    };
+    this.expenses.unshift(newExpense);
+    saveToStorage(KEYS.EXPENSES, this.expenses);
+
+    this.addNotification({
+      title: 'Gider Kaydedildi',
+      message: `"${data.title}" için ${data.amount.toLocaleString('tr-TR')} ₺ gider işlendi (${data.category}).`,
+      type: 'info',
+      linkTab: 'expenses',
+    });
+
+    this.notify();
+    return { success: true, expense: newExpense };
+  }
+
+  deleteExpense(id: string): { success: boolean } {
+    this.expenses = this.expenses.filter((e) => e.id !== id);
+    saveToStorage(KEYS.EXPENSES, this.expenses);
+    this.notify();
+    return { success: true };
+  }
+
+  // Staff & Payroll / Personel & Maaş
+  getStaff(): Staff[] {
+    return [...this.staff];
+  }
+
+  addStaff(data: Omit<Staff, 'id'>): { success: boolean; staff: Staff } {
+    const newStaff: Staff = {
+      ...data,
+      id: `stf-${Date.now()}`,
+    };
+    this.staff.push(newStaff);
+    saveToStorage(KEYS.STAFF, this.staff);
+    this.notify();
+    return { success: true, staff: newStaff };
+  }
+
+  updateStaff(id: string, updates: Partial<Staff>): { success: boolean } {
+    const stf = this.staff.find((s) => s.id === id);
+    if (!stf) return { success: false };
+    Object.assign(stf, updates);
+    saveToStorage(KEYS.STAFF, this.staff);
+    this.notify();
+    return { success: true };
+  }
+
+  getSalaryPayments(): SalaryPayment[] {
+    return [...this.salaryPayments];
+  }
+
+  paySalary(params: {
+    staffId: string;
+    amount: number;
+    paymentMethod: 'cash' | 'bank_transfer';
+    notes?: string;
+    date?: string;
+  }): { success: boolean; error?: string; payment?: SalaryPayment } {
+    const staffMember = this.staff.find((s) => s.id === params.staffId);
+    if (!staffMember) return { success: false, error: 'Personel bulunamadı!' };
+
+    const date = params.date || new Date().toISOString();
+    const month = date.substring(0, 7);
+
+    const payment: SalaryPayment = {
+      id: `sal-${Date.now()}`,
+      staffId: staffMember.id,
+      staffName: staffMember.fullName,
+      date,
+      month,
+      salaryAmount: staffMember.monthlySalary,
+      paidAmount: params.amount,
+      remainingAmount: Math.max(0, staffMember.monthlySalary - params.amount),
+      paymentMethod: params.paymentMethod,
+      notes: params.notes,
+      createdAt: new Date().toISOString(),
+    };
+
+    this.salaryPayments.unshift(payment);
+    saveToStorage(KEYS.SALARY_PAYMENTS, this.salaryPayments);
+
+    // Auto-create expense
+    this.addExpense({
+      title: `${staffMember.fullName} - Personel Maaş Ödemesi`,
+      category: 'Maaş',
+      amount: params.amount,
+      date,
+      paymentMethod: params.paymentMethod,
+      recipientOrCompany: staffMember.fullName,
+      documentNo: `MAAS-${month}-${staffMember.id.slice(-4)}`,
+      notes: params.notes || `${staffMember.role} aylık maaş ödemesi`,
+    });
+
+    this.notify();
+    return { success: true, payment };
+  }
+
+  // Returns / Müşteri İadeleri
+  getProductReturns(): ProductReturn[] {
+    return [...this.productReturns];
+  }
+
+  addProductReturn(data: Omit<ProductReturn, 'id' | 'returnNo' | 'createdAt'>): { success: boolean; error?: string; returnRecord?: ProductReturn } {
+    const product = this.products.find((p) => p.id === data.productId);
+    if (!product) return { success: false, error: 'Ürün bulunamadı!' };
+
+    const returnNo = `IADE-2026-${String(this.productReturns.length + 101).padStart(4, '0')}`;
+    const newReturn: ProductReturn = {
+      ...data,
+      id: `ret-${Date.now()}`,
+      returnNo,
+      createdAt: new Date().toISOString(),
+    };
+
+    this.productReturns.unshift(newReturn);
+    saveToStorage(KEYS.PRODUCT_RETURNS, this.productReturns);
+
+    if (data.returnToStock) {
+      const prevStock = product.stock;
+      product.stock += data.quantity;
+      product.updatedAt = new Date().toISOString();
+      saveToStorage(KEYS.PRODUCTS, this.products);
+
+      this.addStockMovement({
+        productId: product.id,
+        productName: product.name,
+        type: 'return',
+        quantity: data.quantity,
+        unit: product.unit,
+        previousStock: prevStock,
+        newStock: product.stock,
+        referenceId: returnNo,
+        notes: `Müşteri İadesi: ${returnNo} (${data.customerName}) - Neden: ${data.reason}`,
+        performedBy: this.company.contactPerson,
+      });
+    }
+
+    if (data.customerId) {
+      const customer = this.customers.find((c) => c.id === data.customerId);
+      if (customer && customer.balance > 0) {
+        customer.balance = Math.max(0, customer.balance - data.refundAmount);
+        customer.transactions.unshift({
+          id: `ctx-${Date.now()}`,
+          date: data.date,
+          type: 'return',
+          amount: data.refundAmount,
+          description: `Ürün İadesi: ${returnNo} (${data.productName} x ${data.quantity})`,
+          documentNo: returnNo,
+          balanceAfter: customer.balance,
+        });
+        saveToStorage(KEYS.CUSTOMERS, this.customers);
+      }
+    }
+
+    this.addNotification({
+      title: 'İade Kaydedildi',
+      message: `${data.customerName} müşterisinden ${data.quantity} ${data.unit} "${data.productName}" iadesi alındı.`,
+      type: 'info',
+      linkTab: 'invoices',
+    });
+
+    this.notify();
+    return { success: true, returnRecord: newReturn };
+  }
+
+  // Cash Flow Analysis
+  getCashFlow(period: 'today' | 'week' | 'month' | 'all' = 'month') {
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    const monthStr = todayStr.substring(0, 7);
+
+    const filterFn = (dateStr: string) => {
+      if (!dateStr) return false;
+      if (period === 'all') return true;
+      if (period === 'today') return dateStr.startsWith(todayStr);
+      if (period === 'month') return dateStr.startsWith(monthStr);
+      if (period === 'week') {
+        const d = new Date(dateStr);
+        const diffDays = (now.getTime() - d.getTime()) / (1000 * 3600 * 24);
+        return diffDays >= 0 && diffDays <= 7;
+      }
+      return true;
+    };
+
+    let cashSales = 0;
+    let cardSales = 0;
+    let bankSales = 0;
+    let collections = 0;
+
+    for (const s of this.sales) {
+      if (s.status === 'cancelled') continue;
+      if (!filterFn(s.date)) continue;
+      if (s.paymentMethod === 'cash') cashSales += s.grandTotal;
+      if (s.paymentMethod === 'credit_card') cardSales += s.grandTotal;
+      if (s.paymentMethod === 'bank_transfer') bankSales += s.grandTotal;
+    }
+
+    for (const c of this.customers) {
+      for (const tx of c.transactions || []) {
+        if (tx.type === 'payment' && filterFn(tx.date)) {
+          collections += tx.amount;
+        }
+      }
+    }
+
+    const totalInflow = cashSales + cardSales + bankSales + collections;
+
+    let purchasePayments = 0;
+    for (const p of this.purchases) {
+      if (p.paymentStatus === 'paid' && filterFn(p.date)) {
+        purchasePayments += p.totalCost;
+      }
+    }
+
+    let expensePayments = 0;
+    const categoryBreakdown: Record<string, number> = {};
+
+    for (const e of this.expenses) {
+      if (!filterFn(e.date)) continue;
+      expensePayments += e.amount;
+      categoryBreakdown[e.category] = (categoryBreakdown[e.category] || 0) + e.amount;
+    }
+
+    const totalOutflow = purchasePayments + expensePayments;
+    const netCashFlow = totalInflow - totalOutflow;
+
+    return {
+      totalInflow: Number(totalInflow.toFixed(2)),
+      totalOutflow: Number(totalOutflow.toFixed(2)),
+      netCashFlow: Number(netCashFlow.toFixed(2)),
+      inflows: {
+        cashSales: Number(cashSales.toFixed(2)),
+        cardSales: Number(cardSales.toFixed(2)),
+        bankSales: Number(bankSales.toFixed(2)),
+        collections: Number(collections.toFixed(2)),
+      },
+      outflows: {
+        purchasePayments: Number(purchasePayments.toFixed(2)),
+        expensePayments: Number(expensePayments.toFixed(2)),
+        categoryBreakdown,
+      },
+    };
+  }
+
+  // Product-Level Profitability
+  getProductProfitability() {
+    const map = new Map<string, {
+      product: Product;
+      soldQuantity: number;
+      revenue: number;
+      cost: number;
+      grossProfit: number;
+      profitMargin: number;
+    }>();
+
+    for (const p of this.products) {
+      map.set(p.id, {
+        product: p,
+        soldQuantity: 0,
+        revenue: 0,
+        cost: 0,
+        grossProfit: 0,
+        profitMargin: 0,
+      });
+    }
+
+    for (const sale of this.sales) {
+      if (sale.status === 'cancelled') continue;
+      for (const item of sale.items) {
+        const entry = map.get(item.productId);
+        if (entry) {
+          entry.soldQuantity += item.quantity;
+          entry.revenue += item.lineTotal;
+          entry.cost += item.lineCost;
+          entry.grossProfit += item.lineProfit;
+        }
+      }
+    }
+
+    const list = Array.from(map.values()).map((item) => ({
+      ...item,
+      profitMargin: item.revenue > 0 ? Number(((item.grossProfit / item.revenue) * 100).toFixed(1)) : 0,
+    }));
+
+    const topSelling = [...list].sort((a, b) => b.soldQuantity - a.soldQuantity).slice(0, 5);
+    const topProfitable = [...list].sort((a, b) => b.grossProfit - a.grossProfit).slice(0, 5);
+    const leastProfitable = [...list].filter((i) => i.soldQuantity > 0).sort((a, b) => a.grossProfit - b.grossProfit).slice(0, 5);
+
+    return {
+      all: list,
+      topSelling,
+      topProfitable,
+      leastProfitable,
     };
   }
 
@@ -2005,6 +2705,11 @@ export class TeoriKimyaRepository {
     this.movements = INITIAL_STOCK_MOVEMENTS;
     this.productions = INITIAL_PRODUCTION_ORDERS;
     this.notifications = INITIAL_NOTIFICATIONS;
+    this.purchases = INITIAL_PURCHASES;
+    this.expenses = INITIAL_EXPENSES;
+    this.staff = INITIAL_STAFF;
+    this.salaryPayments = INITIAL_SALARY_PAYMENTS;
+    this.productReturns = INITIAL_PRODUCT_RETURNS;
 
     saveToStorage(KEYS.COMPANY, this.company);
     saveToStorage(KEYS.PRODUCTS, this.products);
@@ -2017,6 +2722,11 @@ export class TeoriKimyaRepository {
     saveToStorage(KEYS.MOVEMENTS, this.movements);
     saveToStorage(KEYS.PRODUCTIONS, this.productions);
     saveToStorage(KEYS.NOTIFICATIONS, this.notifications);
+    saveToStorage(KEYS.PURCHASES, this.purchases);
+    saveToStorage(KEYS.EXPENSES, this.expenses);
+    saveToStorage(KEYS.STAFF, this.staff);
+    saveToStorage(KEYS.SALARY_PAYMENTS, this.salaryPayments);
+    saveToStorage(KEYS.PRODUCT_RETURNS, this.productReturns);
 
     this.notify();
   }
@@ -2078,6 +2788,26 @@ export class TeoriKimyaRepository {
         this.productions = data.productions;
         saveToStorage(KEYS.PRODUCTIONS, this.productions);
       }
+      if (data.purchases && Array.isArray(data.purchases)) {
+        this.purchases = data.purchases;
+        saveToStorage(KEYS.PURCHASES, this.purchases);
+      }
+      if (data.expenses && Array.isArray(data.expenses)) {
+        this.expenses = data.expenses;
+        saveToStorage(KEYS.EXPENSES, this.expenses);
+      }
+      if (data.staff && Array.isArray(data.staff)) {
+        this.staff = data.staff;
+        saveToStorage(KEYS.STAFF, this.staff);
+      }
+      if (data.salaryPayments && Array.isArray(data.salaryPayments)) {
+        this.salaryPayments = data.salaryPayments;
+        saveToStorage(KEYS.SALARY_PAYMENTS, this.salaryPayments);
+      }
+      if (data.productReturns && Array.isArray(data.productReturns)) {
+        this.productReturns = data.productReturns;
+        saveToStorage(KEYS.PRODUCT_RETURNS, this.productReturns);
+      }
       this.notify();
       return true;
     } catch (e) {
@@ -2100,6 +2830,11 @@ export class TeoriKimyaRepository {
         orders: this.orders,
         movements: this.movements,
         productions: this.productions,
+        purchases: this.purchases,
+        expenses: this.expenses,
+        staff: this.staff,
+        salaryPayments: this.salaryPayments,
+        productReturns: this.productReturns,
         exportedAt: new Date().toISOString(),
       },
       null,

@@ -13,7 +13,12 @@ import {
   Printer,
   Sparkles,
   Camera,
+  CameraOff,
+  RefreshCw,
+  X,
+  Volume2,
 } from 'lucide-react';
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { Button } from '../common/Button';
 import { Badge } from '../common/Badge';
 import { Modal } from '../common/Modal';
@@ -34,13 +39,27 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
   const [notFoundBarcode, setNotFoundBarcode] = useState<string | null>(null);
   const [quickSellQuantity, setQuickSellQuantity] = useState(1);
   const [quickSellSuccess, setQuickSellSuccess] = useState<string | null>(null);
-  const [isSimulatingCamera, setIsSimulatingCamera] = useState(false);
 
+  // Real Camera Scanner State
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [isCameraLoading, setIsCameraLoading] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const lastScannedTimeRef = useRef<number>(0);
+  const lastScannedCodeRef = useRef<string>('');
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Focus input automatically
+  // Focus input automatically on mount
   useEffect(() => {
     inputRef.current?.focus();
+  }, []);
+
+  // Teardown camera on unmount
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
   }, []);
 
   const handleScan = (codeToScan?: string) => {
@@ -59,10 +78,123 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
     }
   };
 
+  const startCamera = async () => {
+    setIsCameraLoading(true);
+    setCameraError(null);
+
+    try {
+      // 1. Teardown any existing instance first
+      if (scannerRef.current) {
+        try {
+          if (scannerRef.current.isScanning) {
+            await scannerRef.current.stop();
+          }
+          await scannerRef.current.clear();
+        } catch (_) {}
+        scannerRef.current = null;
+      }
+
+      // Check if mediaDevices is supported
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Tarayıcınız kamera erişimini desteklemiyor veya güvenli (HTTPS/localhost) bağlantıda değilsiniz.');
+      }
+
+      const formatsToSupport = [
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E,
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.QR_CODE,
+      ];
+
+      const html5QrCode = new Html5Qrcode('qr-reader-container', {
+        formatsToSupport,
+        verbose: false,
+      });
+      scannerRef.current = html5QrCode;
+
+      const config = {
+        fps: 15,
+        qrbox: { width: 280, height: 180 },
+        aspectRatio: 1.333333,
+      };
+
+      // Prefer rear camera on mobile devices
+      await html5QrCode.start(
+        { facingMode: 'environment' },
+        config,
+        (decodedText) => {
+          // Debounce duplicate scans within 2.5 seconds
+          const now = Date.now();
+          if (
+            decodedText === lastScannedCodeRef.current &&
+            now - lastScannedTimeRef.current < 2500
+          ) {
+            return;
+          }
+          lastScannedCodeRef.current = decodedText;
+          lastScannedTimeRef.current = now;
+
+          // Haptic feedback on supported mobile devices
+          if ('vibrate' in navigator) {
+            try {
+              navigator.vibrate(100);
+            } catch (_) {}
+          }
+
+          setBarcodeInput(decodedText);
+          handleScan(decodedText);
+        },
+        () => {
+          // Frame error ignored
+        }
+      );
+
+      setIsCameraActive(true);
+    } catch (err: any) {
+      console.error('Camera initialization error:', err);
+      let message = 'Kamera başlatılamadı.';
+      const errStr = err?.message || String(err);
+
+      if (err?.name === 'NotAllowedError' || errStr.includes('NotAllowedError') || errStr.includes('Permission denied')) {
+        message = 'Kamera izni reddedildi. Lütfen tarayıcınızın adres çubuğundaki kilit simgesine dokunarak kamera erişimine izin veriniz.';
+      } else if (err?.name === 'NotFoundError' || errStr.includes('NotFoundError') || errStr.includes('Requested device not found')) {
+        message = 'Cihazınızda kullanılabilir bir kamera bulunamadı.';
+      } else if (err?.name === 'NotReadableError' || errStr.includes('NotReadableError')) {
+        message = 'Kamera başka bir uygulama veya sekme tarafından meşgul ediliyor.';
+      } else {
+        message = `Kamera hatası: ${errStr}`;
+      }
+
+      setCameraError(message);
+      setIsCameraActive(false);
+    } finally {
+      setIsCameraLoading(false);
+    }
+  };
+
+  const stopCamera = async () => {
+    if (scannerRef.current) {
+      try {
+        if (scannerRef.current.isScanning) {
+          await scannerRef.current.stop();
+        }
+        await scannerRef.current.clear();
+      } catch (e) {
+        console.warn('Scanner stop error:', e);
+      }
+      scannerRef.current = null;
+    }
+    setIsCameraActive(false);
+    setIsCameraLoading(false);
+  };
+
   const handleQuickSale = () => {
     if (!scannedProduct) return;
     if (scannedProduct.stock < quickSellQuantity) {
-      alert(`Yetersiz stok! Mevcut stok: ${scannedProduct.stock}`);
+      alert(`Yetersiz stok! Mevcut stok: ${scannedProduct.stock} ${scannedProduct.unit}`);
       return;
     }
 
@@ -92,7 +224,7 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
     }
   };
 
-  const sampleBarcodes = repository.getProducts().slice(0, 4);
+  const sampleBarcodes = repository.getProducts().slice(0, 5);
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto animate-in fade-in duration-200">
@@ -100,13 +232,13 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
       <div className="text-center space-y-2">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-400/30 text-cyan-300 text-xs font-semibold">
           <QrCode className="w-3.5 h-3.5 animate-pulse" />
-          Klavye & Kamera / El Terminali Destekli
+          Mobil Canlı Kamera & El Terminali Lazer Destekli
         </div>
         <h2 className="text-2xl sm:text-3xl font-black text-white tracking-wide">
-          Barkod / QR Tarama Terminali
+          Barkod / QR Tarama & Kamera Terminali
         </h2>
         <p className="text-xs sm:text-sm text-slate-400 max-w-lg mx-auto">
-          El terminali veya barkod okuyucu lazeri ile okutulan kodlar anında algılanır. Manuel kod girişi için alana yazıp Enter tuşuna basabilirsiniz.
+          Cihazınızın kamerasını açarak canlı barkod tarayabilir, USB/Bluetooth el terminali okutabilir veya elle barkod yazabilirsiniz.
         </p>
       </div>
 
@@ -140,19 +272,82 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
             >
               Sorgula
             </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              size="lg"
-              onClick={() => {
-                setIsSimulatingCamera(!isSimulatingCamera);
-              }}
-              title="Kamera Simülatörü"
-            >
-              <Camera className="w-5 h-5 text-cyan-400" />
-            </Button>
+            
+            {isCameraActive ? (
+              <Button
+                type="button"
+                variant="danger"
+                size="lg"
+                onClick={stopCamera}
+                icon={<CameraOff className="w-5 h-5" />}
+                title="Kamerayı Kapat"
+              >
+                Kamerayı Kapat
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="primary"
+                size="lg"
+                onClick={startCamera}
+                disabled={isCameraLoading}
+                icon={isCameraLoading ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Camera className="w-5 h-5" />}
+                title="Canlı Kamerayı Başlat"
+              >
+                {isCameraLoading ? 'Kamera Açılıyor...' : 'Kamera Aç'}
+              </Button>
+            )}
           </div>
         </form>
+
+        {/* Camera Error Message */}
+        {cameraError && (
+          <div className="p-4 rounded-xl bg-red-950/50 border border-red-500/50 text-red-200 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in">
+            <div className="flex items-start gap-2.5">
+              <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold text-white">Kamera Başlatılamadı</p>
+                <p className="mt-0.5 text-red-300">{cameraError}</p>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={startCamera}
+              icon={<RefreshCw className="w-3.5 h-3.5" />}
+            >
+              Tekrar Dene
+            </Button>
+          </div>
+        )}
+
+        {/* Live Camera Viewport Container */}
+        <div className={`space-y-3 ${isCameraActive ? 'block' : 'hidden'}`}>
+          <div className="relative w-full rounded-2xl overflow-hidden bg-black border-2 border-cyan-400 shadow-[0_0_25px_rgba(6,182,212,0.35)] flex flex-col items-center justify-center min-h-[300px]">
+            {/* Live Camera Stream Container target for Html5Qrcode */}
+            <div id="qr-reader-container" className="w-full max-w-md mx-auto" />
+
+            {/* Visual Guide Overlay */}
+            <div className="absolute top-3 left-3 flex items-center gap-2 px-3 py-1 rounded-full bg-black/70 border border-cyan-400/40 text-cyan-300 text-xs font-mono backdrop-blur-sm pointer-events-none z-10">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+              <span>Canlı Arka Kamera Aktif (EAN-13, EAN-8, UPC, QR)</span>
+            </div>
+
+            <div className="absolute bottom-3 right-3 z-10">
+              <button
+                type="button"
+                onClick={stopCamera}
+                className="px-3 py-1.5 rounded-xl bg-red-900/80 hover:bg-red-800 border border-red-500 text-white text-xs font-bold flex items-center gap-1.5 backdrop-blur cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+                Durdur
+              </button>
+            </div>
+          </div>
+          <p className="text-center text-xs text-cyan-300 font-mono">
+            Barkod veya QR kodu yeşil çerçevenin ortasına hizalayınız. Otomatik algılanır.
+          </p>
+        </div>
 
         {/* Demo Fast Scan Quick Chips */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
@@ -170,18 +365,6 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
             </button>
           ))}
         </div>
-
-        {/* Camera Optical Reader Visual Simulation */}
-        {isSimulatingCamera && (
-          <div className="relative w-full h-48 rounded-xl bg-black/80 border-2 border-dashed border-cyan-400 flex flex-col items-center justify-center overflow-hidden animate-in zoom-in-95">
-            {/* Moving Laser line */}
-            <div className="absolute inset-x-4 h-0.5 bg-red-500 shadow-[0_0_12px_#ff0000] animate-bounce" />
-            <QrCode className="w-16 h-16 text-cyan-400/40" />
-            <p className="text-xs text-cyan-300 mt-2 font-mono">
-              Optik Kamera Alanı Aktif — Barkodu hedefe tutunuz
-            </p>
-          </div>
-        )}
       </div>
 
       {/* Success Notification Alert */}
@@ -205,7 +388,7 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
         <div className="p-6 rounded-2xl bg-gradient-to-br from-[#0B1B2E] via-[#102A43] to-[#0B1B2E] border-2 border-cyan-500/40 shadow-2xl space-y-6 animate-in slide-in-from-bottom-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-cyan-500/20">
             <div>
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <span className="font-mono text-xs font-black text-cyan-300 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-500/30">
                   {scannedProduct.code}
                 </span>
@@ -226,7 +409,7 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
               <div className="text-2xl sm:text-3xl font-black text-[#8DE7F2]">
                 {scannedProduct.salePrice.toLocaleString('tr-TR')} ₺
               </div>
-              <span className="text-[10px] text-slate-400">+%20 KDV Dahil</span>
+              <span className="text-[10px] text-slate-400">+%{scannedProduct.vatRate} KDV</span>
             </div>
           </div>
 
@@ -236,8 +419,10 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
               <span className="text-[10px] text-slate-400 uppercase font-semibold">Mevcut Stok</span>
               <p
                 className={`text-lg font-black ${
-                  scannedProduct.stock <= scannedProduct.minStock
-                    ? 'text-red-400'
+                  scannedProduct.stock <= 0
+                    ? 'text-red-500'
+                    : scannedProduct.stock <= scannedProduct.minStock
+                    ? 'text-amber-400'
                     : 'text-emerald-400'
                 }`}
               >
@@ -251,9 +436,9 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
             </div>
 
             <div className="p-3 rounded-xl bg-[#07111F]/60 border border-slate-800">
-              <span className="text-[10px] text-slate-400 uppercase font-semibold">pH Değeri</span>
-              <p className="text-lg font-black text-cyan-300">
-                {scannedProduct.phValue ? scannedProduct.phValue : 'Nötr (7)'}
+              <span className="text-[10px] text-slate-400 uppercase font-semibold">Birim Alış Maliyeti</span>
+              <p className="text-lg font-black text-slate-200">
+                {scannedProduct.purchasePrice.toLocaleString('tr-TR')} ₺
               </p>
             </div>
 
@@ -271,6 +456,7 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
               <span className="text-xs text-slate-300 font-semibold">Miktar:</span>
               <div className="flex items-center bg-[#102A43] border border-cyan-500/30 rounded-xl p-0.5">
                 <button
+                  type="button"
                   onClick={() => setQuickSellQuantity(Math.max(1, quickSellQuantity - 1))}
                   className="px-2.5 py-1 text-slate-300 hover:text-white font-bold"
                 >
@@ -285,12 +471,16 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
                   className="w-12 text-center bg-transparent text-white font-bold text-xs"
                 />
                 <button
+                  type="button"
                   onClick={() => setQuickSellQuantity(quickSellQuantity + 1)}
                   className="px-2.5 py-1 text-slate-300 hover:text-white font-bold"
                 >
                   +
                 </button>
               </div>
+              <span className="text-xs text-slate-400 ml-2">
+                Toplam: {(quickSellQuantity * scannedProduct.salePrice).toLocaleString('tr-TR')} ₺
+              </span>
             </div>
 
             <div className="flex items-center gap-2">
@@ -307,14 +497,14 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
                 onClick={() => onNavigate('pos')}
                 icon={<ArrowRight className="w-4 h-4" />}
               >
-                POS Sepetine Git
+                Kasa / POS'a Git
               </Button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Not Found State (Requirement: Prompt to add as new product with prefilled barcode) */}
+      {/* Not Found State */}
       {notFoundBarcode && (
         <div className="p-6 rounded-2xl bg-amber-950/30 border border-amber-500/40 text-center space-y-4 animate-in slide-in-from-bottom-3">
           <div className="w-12 h-12 mx-auto rounded-full bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
@@ -326,7 +516,7 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
               Barkod Numarası: <span className="text-amber-300 font-bold">{notFoundBarcode}</span>
             </p>
             <p className="text-xs text-slate-400">
-              Bu ürünü sisteminize yeni kimyasal mamül olarak hemen ekleyebilirsiniz.
+              Bu ürünü sisteminize yeni kimyasal mamül veya hammadde olarak hemen ekleyebilirsiniz.
             </p>
           </div>
 
