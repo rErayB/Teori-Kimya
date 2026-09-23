@@ -1,0 +1,6 @@
+{
+  "name": "TEORİ KİMYA - ERP & B2B Portal",
+  "description": "Teori Kimya Endüstriyel ve Kurumsal Temizlik Ürünleri ERP, Satış, Stok, Üretim ve B2B Yönetim Portalı",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
