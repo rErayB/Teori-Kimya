@@ -14,6 +14,7 @@ import {
   X,
   AlertCircle,
   Receipt,
+  Camera,
 } from 'lucide-react';
 import { Button } from '../common/Button';
 import { Modal } from '../common/Modal';
@@ -266,16 +267,28 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenScanner }) => {
         {/* Search & Barcode & Quick Quantity Bar */}
         <div className="p-3 rounded-2xl bg-[#0B1B2E] border border-cyan-500/20 shadow-md flex flex-wrap sm:flex-nowrap items-center gap-2">
           {/* Barcode scanner input */}
-          <form onSubmit={handleBarcodeSubmit} className="flex-1 relative flex items-center min-w-[200px]">
-            <Barcode className="w-5 h-5 text-cyan-400 absolute left-3 pointer-events-none" />
-            <input
-              ref={barcodeInputRef}
-              type="text"
-              placeholder="Barkod okutun veya yazıp Enter'a basın..."
-              value={barcodeInput}
-              onChange={(e) => setBarcodeInput(e.target.value)}
-              className="w-full bg-[#102A43] border border-cyan-500/30 rounded-xl pl-10 pr-3 py-2 text-xs sm:text-sm text-white placeholder-slate-400 focus:outline-none focus:border-cyan-400"
-            />
+          <form onSubmit={handleBarcodeSubmit} className="flex-1 relative flex items-center min-w-[200px] gap-2">
+            <div className="relative flex-1">
+              <Barcode className="w-5 h-5 text-cyan-400 absolute left-3 top-2.5 pointer-events-none" />
+              <input
+                ref={barcodeInputRef}
+                type="text"
+                placeholder="Barkod okutun veya yazıp Enter'a basın..."
+                value={barcodeInput}
+                onChange={(e) => setBarcodeInput(e.target.value)}
+                className="w-full bg-[#102A43] border border-cyan-500/30 rounded-xl pl-10 pr-3 py-2 text-xs sm:text-sm text-white placeholder-slate-400 focus:outline-none focus:border-cyan-400"
+              />
+            </div>
+            {onOpenScanner && (
+              <button
+                type="button"
+                onClick={onOpenScanner}
+                className="p-2 rounded-xl bg-cyan-950/60 hover:bg-cyan-900/60 border border-cyan-500/40 text-cyan-300 hover:text-white transition-colors cursor-pointer shrink-0"
+                title="Kamera ile Barkod Tara"
+              >
+                <Camera className="w-5 h-5" />
+              </button>
+            )}
           </form>
 
           {/* Quick Quantity Input Multiplier */}

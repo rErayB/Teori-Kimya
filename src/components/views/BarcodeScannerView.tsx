@@ -17,6 +17,8 @@ import {
   RefreshCw,
   X,
   Volume2,
+  Upload,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { Button } from '../common/Button';
@@ -47,21 +49,31 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [availableCameras, setAvailableCameras] = useState<{ id: string; label: string }[]>([]);
   const [activeCameraId, setActiveCameraId] = useState<string | null>(null);
+  const [isScanningFile, setIsScanningFile] = useState(false);
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const fileScannerRef = useRef<Html5Qrcode | null>(null);
   const lastScannedTimeRef = useRef<number>(0);
   const lastScannedCodeRef = useRef<string>('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // iOS Safari requires video element to have playsinline and webkit-playsinline attributes
   const enforceVideoPlaysInline = () => {
     try {
-      const videos = document.querySelectorAll<HTMLVideoElement>('#qr-reader-container video');
+      const container = document.getElementById('qr-reader-container');
+      if (!container) return;
+      const videos = container.querySelectorAll<HTMLVideoElement>('video');
       videos.forEach((video) => {
         video.setAttribute('playsinline', 'true');
         video.setAttribute('webkit-playsinline', 'true');
         video.setAttribute('muted', 'true');
         video.muted = true;
+        video.setAttribute('autoplay', 'true');
+        video.autoplay = true;
+        video.style.width = '100%';
+        video.style.height = '100%';
+        video.style.objectFit = 'cover';
         video.play?.().catch(() => {});
       });
     } catch (_) {}
@@ -113,33 +125,14 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
       }
 
       // Check if mediaDevices is supported
-      if (typeof navigator === 'undefined' || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      if (
+        typeof navigator === 'undefined' ||
+        !navigator.mediaDevices ||
+        !navigator.mediaDevices.getUserMedia
+      ) {
         throw new Error(
-          'Tarayıcınız kamera erişimini desteklemiyor veya bağlantınız HTTPS ile korunmuyor. Netlify üzerinden HTTPS bağlantısı kullandığınızdan emin olun.'
+          'Tarayıcınız canlı kamera erişimini desteklemiyor veya bağlantınız HTTPS ile korunmuyor. Aşağıdaki "Fotoğraf Çekerek Oku" butonunu kullanabilirsiniz.'
         );
-      }
-
-      // Query devices if possible
-      let cameraToUse: any = { facingMode: 'environment' };
-      try {
-        const devices = await Html5Qrcode.getCameras();
-        if (devices && devices.length > 0) {
-          setAvailableCameras(devices);
-          if (targetCameraId) {
-            cameraToUse = targetCameraId;
-            setActiveCameraId(targetCameraId);
-          } else {
-            // Find rear camera on iPhone/Android
-            const rearCamera =
-              devices.find((d) => /back|rear|arka|environment|telephoto|wide/i.test(d.label)) ||
-              devices[devices.length - 1]; // On iOS, back camera is usually last
-            cameraToUse = rearCamera.id;
-            setActiveCameraId(rearCamera.id);
-          }
-        }
-      } catch (devErr) {
-        console.warn('Could not enumerate cameras, falling back to facingMode:', devErr);
-        cameraToUse = { facingMode: 'environment' };
       }
 
       const formatsToSupport = [
@@ -158,14 +151,17 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
       });
       scannerRef.current = html5QrCode;
 
+      // Note: Do not pass rigid aspectRatio to avoid OverconstrainedError on portrait iPhones
       const config = {
         fps: 15,
-        qrbox: { width: 280, height: 180 },
-        aspectRatio: 1.333333,
+        qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+          const width = Math.floor(Math.min(viewfinderWidth * 0.85, 320));
+          const height = Math.floor(Math.min(viewfinderHeight * 0.65, 200));
+          return { width: Math.max(160, width), height: Math.max(120, height) };
+        },
       };
 
       const onScanSuccess = (decodedText: string) => {
-        // Debounce duplicate scans within 2.5 seconds
         const now = Date.now();
         if (
           decodedText === lastScannedCodeRef.current &&
@@ -176,7 +172,6 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
         lastScannedCodeRef.current = decodedText;
         lastScannedTimeRef.current = now;
 
-        // Haptic feedback on supported mobile devices
         if ('vibrate' in navigator) {
           try {
             navigator.vibrate(100);
@@ -187,20 +182,47 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
         handleScan(decodedText);
       };
 
+      // Prioritize explicit target camera ID if chosen by user, otherwise standard environment back camera
+      const cameraConstraint = targetCameraId || { facingMode: 'environment' };
+
       try {
-        await html5QrCode.start(cameraToUse, config, onScanSuccess, () => {});
-      } catch (firstErr) {
-        console.warn('First camera start attempt failed, falling back to environment facingMode:', firstErr);
-        // Fallback for iOS Safari if specific camera ID failed
-        await html5QrCode.start({ facingMode: 'environment' }, config, onScanSuccess, () => {});
+        await html5QrCode.start(cameraConstraint, config, onScanSuccess, () => {});
+      } catch (firstErr: any) {
+        console.warn('First camera start attempt failed, trying fallback:', firstErr);
+        // Fallback for iOS Safari: try user camera or query devices
+        try {
+          await html5QrCode.start({ facingMode: 'user' }, config, onScanSuccess, () => {});
+        } catch (userErr: any) {
+          const devices = await Html5Qrcode.getCameras().catch(() => []);
+          if (devices && devices.length > 0) {
+            const rearCam =
+              devices.find((d) => /back|rear|arka|environment/i.test(d.label)) ||
+              devices[devices.length - 1];
+            await html5QrCode.start(rearCam.id, config, onScanSuccess, () => {});
+          } else {
+            throw firstErr;
+          }
+        }
       }
 
-      // Force video playsinline for iOS Safari
+      // Force video playsinline for iOS Safari WebKit
       enforceVideoPlaysInline();
-      setTimeout(enforceVideoPlaysInline, 200);
-      setTimeout(enforceVideoPlaysInline, 600);
+      setTimeout(enforceVideoPlaysInline, 150);
+      setTimeout(enforceVideoPlaysInline, 500);
 
       setIsCameraActive(true);
+
+      // Populate available cameras in background now that permission is granted
+      Html5Qrcode.getCameras()
+        .then((devices) => {
+          if (devices && devices.length > 0) {
+            setAvailableCameras(devices);
+            if (targetCameraId) {
+              setActiveCameraId(targetCameraId);
+            }
+          }
+        })
+        .catch(() => {});
     } catch (err: any) {
       console.error('Camera initialization error:', err);
       let message = 'Kamera başlatılamadı.';
@@ -212,15 +234,15 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
         errStr.includes('Permission denied')
       ) {
         message =
-          'Kamera izni reddedildi. iOS Safari kullanıyorsanız: Adres çubuğundaki "aA" veya kilit simgesine dokunun > "Web Sitesi Ayarları" > "Kamera" seçeneğini "İzin Ver" olarak değiştirin ve sayfayı yenileyin.';
+          'Kamera izni reddedildi. iPhone Safari için: Adres çubuğundaki "aA" veya kilit simgesine dokunun > "Web Sitesi Ayarları" > "Kamera: İzin Ver" seçip sayfayı yenileyin. Dilerseniz "Fotoğraf Çekerek Oku" butonunu kullanabilirsiniz.';
       } else if (
         err?.name === 'NotFoundError' ||
         errStr.includes('NotFoundError') ||
         errStr.includes('Requested device not found')
       ) {
-        message = 'Cihazınızda kullanılabilir bir kamera bulunamadı.';
+        message = 'Cihazınızda kullanılabilir bir kamera bulunamadı. "Fotoğraf Çekerek Oku" seçeneğini deneyebilirsiniz.';
       } else if (err?.name === 'NotReadableError' || errStr.includes('NotReadableError')) {
-        message = 'Kamera başka bir uygulama veya sekme tarafından kullanılıyor olabilir.';
+        message = 'Kamera başka bir uygulama veya sekme tarafından kullanılıyor. Diğer uygulamaları kapatıp tekrar deneyin.';
       } else {
         message = `Kamera hatası: ${errStr}`;
       }
@@ -252,6 +274,55 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
     stopCamera().then(() => {
       startCamera(newCamId);
     });
+  };
+
+  // Instant Photo / File Scan fallback (works 100% on all iPhones, Safari, and in-app webviews)
+  const handleFileScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsScanningFile(true);
+    setCameraError(null);
+
+    try {
+      const formatsToSupport = [
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E,
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.QR_CODE,
+      ];
+
+      let fileScanner = fileScannerRef.current;
+      if (!fileScanner) {
+        fileScanner = new Html5Qrcode('qr-reader-file-target', {
+          formatsToSupport,
+          verbose: false,
+        });
+        fileScannerRef.current = fileScanner;
+      }
+
+      const decodedText = await fileScanner.scanFile(file, false);
+      if (decodedText) {
+        if ('vibrate' in navigator) {
+          try {
+            navigator.vibrate(100);
+          } catch (_) {}
+        }
+        setBarcodeInput(decodedText);
+        handleScan(decodedText);
+      }
+    } catch (err: any) {
+      console.warn('File scan error:', err);
+      setCameraError(
+        'Fotoğraftan barkod okunamadı. Lütfen barkodun net, iyi aydınlatılmış ve düz bir şekilde çekildiğinden emin olunuz.'
+      );
+    } finally {
+      setIsScanningFile(false);
+      if (e.target) e.target.value = '';
+    }
   };
 
   const handleQuickSale = () => {
@@ -331,7 +402,7 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
             />
           </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             <Button
               type="submit"
               size="lg"
@@ -362,47 +433,94 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
                 icon={isCameraLoading ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Camera className="w-5 h-5" />}
                 title="Canlı Kamerayı Başlat"
               >
-                {isCameraLoading ? 'Kamera Açılıyor...' : 'Kamera Aç'}
+                {isCameraLoading ? 'Açılıyor...' : 'Kamera Aç'}
               </Button>
             )}
+
+            {/* Hidden native camera capture & gallery input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={handleFileScan}
+              className="hidden"
+            />
+            <div id="qr-reader-file-target" className="hidden" />
+
+            {/* Instant Photo / Snapshot Barcode Scan Button */}
+            <Button
+              type="button"
+              variant="secondary"
+              size="lg"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isScanningFile}
+              icon={isScanningFile ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
+              title="iPhone kamerasından fotoğraf çekerek veya galeriden seçerek barkod oku"
+            >
+              {isScanningFile ? 'Okunuyor...' : 'Fotoğrafla Oku'}
+            </Button>
           </div>
         </form>
 
-        {/* Camera Error Message */}
+        {/* Camera Error Message with One-Click Photo Fallback */}
         {cameraError && (
-          <div className="p-4 rounded-xl bg-red-950/50 border border-red-500/50 text-red-200 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in">
+          <div className="p-4 rounded-xl bg-red-950/60 border border-red-500/50 text-red-200 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in">
             <div className="flex items-start gap-2.5">
               <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
               <div>
                 <p className="font-semibold text-white">Kamera Başlatılamadı</p>
-                <p className="mt-0.5 text-red-300">{cameraError}</p>
+                <p className="mt-0.5 text-red-300 leading-relaxed">{cameraError}</p>
               </div>
             </div>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => startCamera()}
-              icon={<RefreshCw className="w-3.5 h-3.5" />}
-            >
-              Tekrar Dene
-            </Button>
+            <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={() => fileInputRef.current?.click()}
+                icon={<Upload className="w-3.5 h-3.5" />}
+              >
+                Fotoğrafla Oku
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => startCamera()}
+                icon={<RefreshCw className="w-3.5 h-3.5" />}
+              >
+                Tekrar Dene
+              </Button>
+            </div>
           </div>
         )}
 
-        {/* Live Camera Viewport Container */}
-        <div className={`space-y-3 ${isCameraActive ? 'block' : 'hidden'}`}>
+        {/* Live Camera Viewport Container (always active or during loading so DOM width/height exist) */}
+        <div className={`space-y-3 ${isCameraActive || isCameraLoading ? 'block' : 'hidden'}`}>
           <div className="relative w-full rounded-2xl overflow-hidden bg-black border-2 border-cyan-400 shadow-[0_0_25px_rgba(6,182,212,0.35)] flex flex-col items-center justify-center min-h-[300px]">
-            {/* Live Camera Stream Container target for Html5Qrcode */}
-            <div id="qr-reader-container" className="w-full max-w-md mx-auto" />
+            {/* Target DOM Element for Html5Qrcode */}
+            <div id="qr-reader-container" className="w-full max-w-md mx-auto min-h-[280px]" />
+
+            {/* Loading Indicator inside scanner container */}
+            {isCameraLoading && (
+              <div className="absolute inset-0 bg-black/85 backdrop-blur-sm flex flex-col items-center justify-center gap-3 z-30 p-4 text-center">
+                <RefreshCw className="w-8 h-8 text-cyan-400 animate-spin" />
+                <p className="font-bold text-white text-sm">Kamera Başlatılıyor...</p>
+                <p className="text-xs text-slate-300 max-w-xs">
+                  Lütfen ekranda çıkan kamera izin kutusunda <strong>"İzin Ver"</strong> seçeneğine basınız.
+                </p>
+              </div>
+            )}
 
             {/* Visual Guide Overlay */}
-            <div className="absolute top-3 left-3 flex items-center gap-2 px-3 py-1 rounded-full bg-black/70 border border-cyan-400/40 text-cyan-300 text-xs font-mono backdrop-blur-sm pointer-events-none z-10">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
-              <span>Canlı Kamera Aktif (EAN-13, EAN-8, UPC, QR)</span>
-            </div>
+            {isCameraActive && (
+              <div className="absolute top-3 left-3 flex items-center gap-2 px-3 py-1 rounded-full bg-black/70 border border-cyan-400/40 text-cyan-300 text-xs font-mono backdrop-blur-sm pointer-events-none z-10">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+                <span>Canlı Kamera Aktif (EAN-13, EAN-8, UPC, QR)</span>
+              </div>
+            )}
 
             {/* Camera Switcher for Multi-Camera iPhones */}
-            {availableCameras.length > 1 && (
+            {isCameraActive && availableCameras.length > 1 && (
               <div className="absolute top-3 right-3 z-10">
                 <select
                   value={activeCameraId || ''}
@@ -418,16 +536,18 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
               </div>
             )}
 
-            <div className="absolute bottom-3 right-3 z-10">
-              <button
-                type="button"
-                onClick={stopCamera}
-                className="px-3 py-1.5 rounded-xl bg-red-900/80 hover:bg-red-800 border border-red-500 text-white text-xs font-bold flex items-center gap-1.5 backdrop-blur cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-                Durdur
-              </button>
-            </div>
+            {isCameraActive && (
+              <div className="absolute bottom-3 right-3 z-10">
+                <button
+                  type="button"
+                  onClick={stopCamera}
+                  className="px-3 py-1.5 rounded-xl bg-red-900/80 hover:bg-red-800 border border-red-500 text-white text-xs font-bold flex items-center gap-1.5 backdrop-blur cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                  Durdur
+                </button>
+              </div>
+            )}
           </div>
           <p className="text-center text-xs text-cyan-300 font-mono">
             Barkod veya QR kodu yeşil çerçevenin ortasına hizalayınız. Otomatik algılanır.
