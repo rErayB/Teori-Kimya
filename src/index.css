@@ -115,3 +115,24 @@ html, body {
     padding: 20px !important;
   }
 }
+
+/* Barcode Scanner Laser Beam Animation */
+@keyframes scanLaser {
+  0% {
+    top: 10%;
+    opacity: 0.8;
+  }
+  50% {
+    top: 85%;
+    opacity: 1;
+  }
+  100% {
+    top: 10%;
+    opacity: 0.8;
+  }
+}
+
+.animate-scan-laser {
+  animation: scanLaser 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+

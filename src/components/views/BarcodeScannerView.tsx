@@ -19,6 +19,11 @@ import {
   Volume2,
   Upload,
   Image as ImageIcon,
+  Focus,
+  Target,
+  Zap,
+  ZapOff,
+  Scan,
 } from 'lucide-react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { Button } from '../common/Button';
@@ -50,6 +55,10 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
   const [availableCameras, setAvailableCameras] = useState<{ id: string; label: string }[]>([]);
   const [activeCameraId, setActiveCameraId] = useState<string | null>(null);
   const [isScanningFile, setIsScanningFile] = useState(false);
+  const [isManualScanning, setIsManualScanning] = useState(false);
+  const [manualScanMessage, setManualScanMessage] = useState<string | null>(null);
+  const [hasTorch, setHasTorch] = useState(false);
+  const [isTorchOn, setIsTorchOn] = useState(false);
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const fileScannerRef = useRef<Html5Qrcode | null>(null);
@@ -57,6 +66,26 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
   const lastScannedCodeRef = useRef<string>('');
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Audio Beep Feedback using Web Audio API
+  const playBeep = () => {
+    try {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioContextClass) {
+        const ctx = new AudioContextClass();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(2000, ctx.currentTime);
+        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.12);
+      }
+    } catch (_) {}
+  };
 
   // iOS Safari requires video element to have playsinline and webkit-playsinline attributes
   const enforceVideoPlaysInline = () => {
@@ -108,9 +137,40 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
     }
   };
 
+  const checkTorchSupport = () => {
+    try {
+      const video = document.querySelector<HTMLVideoElement>('#qr-reader-container video');
+      if (video && video.srcObject) {
+        const stream = video.srcObject as MediaStream;
+        const track = stream.getVideoTracks()[0];
+        if (track) {
+          const caps: any = track.getCapabilities?.() || {};
+          setHasTorch(!!caps.torch);
+        }
+      }
+    } catch (_) {}
+  };
+
+  const toggleTorch = async () => {
+    try {
+      const video = document.querySelector<HTMLVideoElement>('#qr-reader-container video');
+      if (!video || !video.srcObject) return;
+      const track = (video.srcObject as MediaStream).getVideoTracks()[0];
+      if (track) {
+        const newState = !isTorchOn;
+        await track.applyConstraints({ advanced: [{ torch: newState } as any] });
+        setIsTorchOn(newState);
+      }
+    } catch (e) {
+      console.warn('Torch toggle error:', e);
+    }
+  };
+
   const startCamera = async (targetCameraId?: string) => {
     setIsCameraLoading(true);
     setCameraError(null);
+    setManualScanMessage(null);
+    setIsTorchOn(false);
 
     try {
       // 1. Teardown any existing instance first
@@ -148,16 +208,19 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
       const html5QrCode = new Html5Qrcode('qr-reader-container', {
         formatsToSupport,
         verbose: false,
+        experimentalFeatures: {
+          useBarCodeDetectorIfSupported: true,
+        },
       });
       scannerRef.current = html5QrCode;
 
-      // Note: Do not pass rigid aspectRatio to avoid OverconstrainedError on portrait iPhones
+      // Dynamic qrbox for 1D and 2D barcodes
       const config = {
-        fps: 15,
+        fps: 20,
         qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
-          const width = Math.floor(Math.min(viewfinderWidth * 0.85, 320));
-          const height = Math.floor(Math.min(viewfinderHeight * 0.65, 200));
-          return { width: Math.max(160, width), height: Math.max(120, height) };
+          const width = Math.floor(Math.min(viewfinderWidth * 0.9, 360));
+          const height = Math.floor(Math.min(viewfinderHeight * 0.7, 220));
+          return { width: Math.max(180, width), height: Math.max(140, height) };
         },
       };
 
@@ -172,35 +235,44 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
         lastScannedCodeRef.current = decodedText;
         lastScannedTimeRef.current = now;
 
+        playBeep();
         if ('vibrate' in navigator) {
           try {
-            navigator.vibrate(100);
+            navigator.vibrate([100, 50, 100]);
           } catch (_) {}
         }
 
         setBarcodeInput(decodedText);
         handleScan(decodedText);
+        setManualScanMessage(`Barkod okundu: ${decodedText}`);
       };
 
-      // Prioritize explicit target camera ID if chosen by user, otherwise standard environment back camera
-      const cameraConstraint = targetCameraId || { facingMode: 'environment' };
+      // Camera constraint with HD preference
+      const cameraConstraint = targetCameraId || {
+        facingMode: 'environment',
+        width: { ideal: 1920, min: 1280 },
+        height: { ideal: 1080, min: 720 },
+      };
 
       try {
         await html5QrCode.start(cameraConstraint, config, onScanSuccess, () => {});
       } catch (firstErr: any) {
         console.warn('First camera start attempt failed, trying fallback:', firstErr);
-        // Fallback for iOS Safari: try user camera or query devices
         try {
-          await html5QrCode.start({ facingMode: 'user' }, config, onScanSuccess, () => {});
-        } catch (userErr: any) {
-          const devices = await Html5Qrcode.getCameras().catch(() => []);
-          if (devices && devices.length > 0) {
-            const rearCam =
-              devices.find((d) => /back|rear|arka|environment/i.test(d.label)) ||
-              devices[devices.length - 1];
-            await html5QrCode.start(rearCam.id, config, onScanSuccess, () => {});
-          } else {
-            throw firstErr;
+          await html5QrCode.start({ facingMode: 'environment' }, config, onScanSuccess, () => {});
+        } catch (secErr: any) {
+          try {
+            await html5QrCode.start({ facingMode: 'user' }, config, onScanSuccess, () => {});
+          } catch (userErr: any) {
+            const devices = await Html5Qrcode.getCameras().catch(() => []);
+            if (devices && devices.length > 0) {
+              const rearCam =
+                devices.find((d) => /back|rear|arka|environment/i.test(d.label)) ||
+                devices[devices.length - 1];
+              await html5QrCode.start(rearCam.id, config, onScanSuccess, () => {});
+            } else {
+              throw firstErr;
+            }
           }
         }
       }
@@ -209,6 +281,7 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
       enforceVideoPlaysInline();
       setTimeout(enforceVideoPlaysInline, 150);
       setTimeout(enforceVideoPlaysInline, 500);
+      setTimeout(checkTorchSupport, 600);
 
       setIsCameraActive(true);
 
@@ -268,12 +341,165 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
     }
     setIsCameraActive(false);
     setIsCameraLoading(false);
+    setIsTorchOn(false);
+    setHasTorch(false);
   };
 
   const handleSwitchCamera = (newCamId: string) => {
     stopCamera().then(() => {
       startCamera(newCamId);
     });
+  };
+
+  // Dedicated "🎯 ODAKLA & BARKODU OKU" Manual Trigger Function
+  const handleManualFocusAndScan = async () => {
+    if (isManualScanning) return;
+    setIsManualScanning(true);
+    setManualScanMessage(null);
+
+    try {
+      const video = document.querySelector<HTMLVideoElement>('#qr-reader-container video');
+      if (!video || !video.videoWidth || !video.videoHeight) {
+        setManualScanMessage('Kamera görüntüsü henüz hazır değil, lütfen 1 saniye bekleyip tekrar deneyin.');
+        setIsManualScanning(false);
+        return;
+      }
+
+      // Attempt hardware optical focus constraint on active camera track
+      try {
+        if (video.srcObject) {
+          const track = (video.srcObject as MediaStream).getVideoTracks()[0];
+          if (track) {
+            const caps: any = track.getCapabilities?.() || {};
+            if (caps.focusMode?.includes('continuous') || caps.focusMode?.includes('single-shot')) {
+              await track.applyConstraints({
+                advanced: [{ focusMode: caps.focusMode.includes('continuous') ? 'continuous' : 'single-shot' } as any],
+              });
+            }
+          }
+        }
+      } catch (_) {}
+
+      // Optical stabilization pause
+      await new Promise((resolve) => setTimeout(resolve, 80));
+
+      // Capture high-resolution video frame to offscreen canvas
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      if (!ctx) {
+        throw new Error('Canvas context alınamadı.');
+      }
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      let decodedBarcode: string | null = null;
+
+      // Pass 1: Native Hardware BarcodeDetector API (iOS Safari 17+ / Chrome)
+      if ('BarcodeDetector' in window) {
+        try {
+          const barcodeDetector = new (window as any).BarcodeDetector({
+            formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'qr_code'],
+          });
+          const detected = await barcodeDetector.detect(canvas);
+          if (detected && detected.length > 0 && detected[0].rawValue) {
+            decodedBarcode = detected[0].rawValue;
+          }
+        } catch (bdErr) {
+          console.warn('Native BarcodeDetector pass failed:', bdErr);
+        }
+      }
+
+      // Pass 2: High-Resolution Snapshot Blob via Html5Qrcode
+      if (!decodedBarcode) {
+        try {
+          const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.95));
+          if (blob) {
+            const file = new File([blob], 'snapshot.jpg', { type: 'image/jpeg' });
+            let fileScanner = fileScannerRef.current;
+            if (!fileScanner) {
+              fileScanner = new Html5Qrcode('qr-reader-file-target', {
+                formatsToSupport: [
+                  Html5QrcodeSupportedFormats.EAN_13,
+                  Html5QrcodeSupportedFormats.EAN_8,
+                  Html5QrcodeSupportedFormats.UPC_A,
+                  Html5QrcodeSupportedFormats.UPC_E,
+                  Html5QrcodeSupportedFormats.CODE_128,
+                  Html5QrcodeSupportedFormats.CODE_39,
+                  Html5QrcodeSupportedFormats.QR_CODE,
+                ],
+                verbose: false,
+              });
+              fileScannerRef.current = fileScanner;
+            }
+            decodedBarcode = await fileScanner.scanFile(file, false);
+          }
+        } catch (scanErr) {
+          console.warn('Canvas blob scan failed:', scanErr);
+        }
+      }
+
+      // Pass 3: Contrast Enhancement Pass for glossy/damaged barrel barcode labels
+      if (!decodedBarcode) {
+        try {
+          const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const d = imgData.data;
+          const contrast = 1.45;
+          const intercept = 128 * (1 - contrast);
+          for (let i = 0; i < d.length; i += 4) {
+            const gray = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+            const enhanced = Math.min(255, Math.max(0, gray * contrast + intercept));
+            d[i] = enhanced;
+            d[i + 1] = enhanced;
+            d[i + 2] = enhanced;
+          }
+          ctx.putImageData(imgData, 0, 0);
+
+          if ('BarcodeDetector' in window) {
+            try {
+              const barcodeDetector = new (window as any).BarcodeDetector({
+                formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'qr_code'],
+              });
+              const detected = await barcodeDetector.detect(canvas);
+              if (detected && detected.length > 0 && detected[0].rawValue) {
+                decodedBarcode = detected[0].rawValue;
+              }
+            } catch (_) {}
+          }
+
+          if (!decodedBarcode && fileScannerRef.current) {
+            const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.95));
+            if (blob) {
+              const file = new File([blob], 'enhanced.jpg', { type: 'image/jpeg' });
+              decodedBarcode = await fileScannerRef.current.scanFile(file, false);
+            }
+          }
+        } catch (enhErr) {
+          console.warn('Enhanced scan pass failed:', enhErr);
+        }
+      }
+
+      if (decodedBarcode) {
+        playBeep();
+        if ('vibrate' in navigator) {
+          try {
+            navigator.vibrate([100, 50, 100]);
+          } catch (_) {}
+        }
+        setBarcodeInput(decodedBarcode);
+        handleScan(decodedBarcode);
+        setManualScanMessage(`✓ Barkod başarıyla okundu: ${decodedBarcode}`);
+      } else {
+        setManualScanMessage(
+          'Barkod okunamadı. Lütfen kamerayı barkoda 10-15 cm mesafede dik tutarak tekrar "Odakla & Oku" tuşuna basınız veya "Fotoğrafla Oku" butonunu deneyiniz.'
+        );
+      }
+    } catch (err: any) {
+      console.error('Manual focus scan error:', err);
+      setManualScanMessage('Tarama sırasında hata oluştu. Lütfen tekrar deneyiniz.');
+    } finally {
+      setIsManualScanning(false);
+    }
   };
 
   // Instant Photo / File Scan fallback (works 100% on all iPhones, Safari, and in-app webviews)
@@ -283,6 +509,7 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
 
     setIsScanningFile(true);
     setCameraError(null);
+    setManualScanMessage(null);
 
     try {
       const formatsToSupport = [
@@ -306,6 +533,7 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
 
       const decodedText = await fileScanner.scanFile(file, false);
       if (decodedText) {
+        playBeep();
         if ('vibrate' in navigator) {
           try {
             navigator.vibrate(100);
@@ -313,6 +541,7 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
         }
         setBarcodeInput(decodedText);
         handleScan(decodedText);
+        setManualScanMessage(`✓ Fotoğraftan okundu: ${decodedText}`);
       }
     } catch (err: any) {
       console.warn('File scan error:', err);
@@ -496,9 +725,30 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
 
         {/* Live Camera Viewport Container (always active or during loading so DOM width/height exist) */}
         <div className={`space-y-3 ${isCameraActive || isCameraLoading ? 'block' : 'hidden'}`}>
-          <div className="relative w-full rounded-2xl overflow-hidden bg-black border-2 border-cyan-400 shadow-[0_0_25px_rgba(6,182,212,0.35)] flex flex-col items-center justify-center min-h-[300px]">
+          <div className="relative w-full rounded-2xl overflow-hidden bg-black border-2 border-cyan-400 shadow-[0_0_30px_rgba(6,182,212,0.4)] flex flex-col items-center justify-center min-h-[340px]">
             {/* Target DOM Element for Html5Qrcode */}
-            <div id="qr-reader-container" className="w-full max-w-md mx-auto min-h-[280px]" />
+            <div id="qr-reader-container" className="w-full max-w-md mx-auto min-h-[300px]" />
+
+            {/* Viewfinder Target Frame & Laser Scan Beam Animation */}
+            {isCameraActive && (
+              <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10 p-6">
+                <div className="relative w-[280px] h-[180px] sm:w-[320px] sm:h-[200px] border-2 border-cyan-400/50 rounded-2xl shadow-[0_0_20px_rgba(6,182,212,0.25)]">
+                  {/* Corner Targets */}
+                  <div className="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-cyan-400 rounded-tl-lg" />
+                  <div className="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-cyan-400 rounded-tr-lg" />
+                  <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-4 border-l-4 border-cyan-400 rounded-bl-lg" />
+                  <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-4 border-r-4 border-cyan-400 rounded-br-lg" />
+
+                  {/* Animated Red/Cyan Laser Beam */}
+                  <div className="absolute left-2 right-2 h-0.5 bg-gradient-to-r from-transparent via-cyan-300 to-transparent shadow-[0_0_12px_#06b6d4] animate-scan-laser" />
+
+                  {/* Center Target Reticle */}
+                  <div className="absolute inset-0 flex items-center justify-center opacity-30">
+                    <Focus className="w-12 h-12 text-cyan-300" />
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Loading Indicator inside scanner container */}
             {isCameraLoading && (
@@ -511,47 +761,105 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({
               </div>
             )}
 
-            {/* Visual Guide Overlay */}
+            {/* Top Bar: Camera Active Badge & Quick Controls */}
             {isCameraActive && (
-              <div className="absolute top-3 left-3 flex items-center gap-2 px-3 py-1 rounded-full bg-black/70 border border-cyan-400/40 text-cyan-300 text-xs font-mono backdrop-blur-sm pointer-events-none z-10">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
-                <span>Canlı Kamera Aktif (EAN-13, EAN-8, UPC, QR)</span>
-              </div>
-            )}
+              <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2 z-20 pointer-events-auto">
+                <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-black/80 border border-cyan-400/40 text-cyan-300 text-xs font-mono backdrop-blur-md">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+                  <span>Canlı Kamera</span>
+                </div>
 
-            {/* Camera Switcher for Multi-Camera iPhones */}
-            {isCameraActive && availableCameras.length > 1 && (
-              <div className="absolute top-3 right-3 z-10">
-                <select
-                  value={activeCameraId || ''}
-                  onChange={(e) => handleSwitchCamera(e.target.value)}
-                  className="bg-slate-900/90 border border-cyan-400/40 text-white text-xs rounded-lg px-2 py-1 backdrop-blur cursor-pointer"
-                >
-                  {availableCameras.map((cam, idx) => (
-                    <option key={cam.id} value={cam.id}>
-                      {cam.label || `Kamera ${idx + 1}`}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
+                <div className="flex items-center gap-2">
+                  {/* Torch / Flash Toggle Button */}
+                  {hasTorch && (
+                    <button
+                      type="button"
+                      onClick={toggleTorch}
+                      className={`p-2 rounded-xl border backdrop-blur-md transition-colors cursor-pointer ${
+                        isTorchOn
+                          ? 'bg-amber-500 text-black border-amber-300 font-bold shadow-[0_0_15px_rgba(245,158,11,0.5)]'
+                          : 'bg-slate-900/90 text-slate-200 border-cyan-500/40 hover:text-white'
+                      }`}
+                      title={isTorchOn ? 'Flaşı Kapat' : 'Flaşı Aç'}
+                    >
+                      {isTorchOn ? <Zap className="w-4 h-4" /> : <ZapOff className="w-4 h-4" />}
+                    </button>
+                  )}
 
-            {isCameraActive && (
-              <div className="absolute bottom-3 right-3 z-10">
-                <button
-                  type="button"
-                  onClick={stopCamera}
-                  className="px-3 py-1.5 rounded-xl bg-red-900/80 hover:bg-red-800 border border-red-500 text-white text-xs font-bold flex items-center gap-1.5 backdrop-blur cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                  Durdur
-                </button>
+                  {/* Camera Switcher for Multi-Camera iPhones */}
+                  {availableCameras.length > 1 && (
+                    <select
+                      value={activeCameraId || ''}
+                      onChange={(e) => handleSwitchCamera(e.target.value)}
+                      className="bg-slate-900/90 border border-cyan-400/40 text-white text-xs rounded-xl px-2.5 py-1.5 backdrop-blur-md cursor-pointer focus:outline-none"
+                    >
+                      {availableCameras.map((cam, idx) => (
+                        <option key={cam.id} value={cam.id}>
+                          {cam.label || `Lens ${idx + 1}`}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+
+                  {/* Stop Camera Button */}
+                  <button
+                    type="button"
+                    onClick={stopCamera}
+                    className="p-1.5 sm:px-3 sm:py-1.5 rounded-xl bg-red-900/90 hover:bg-red-800 border border-red-500 text-white text-xs font-bold flex items-center gap-1 backdrop-blur-md cursor-pointer shadow-md"
+                    title="Kamerayı Kapat"
+                  >
+                    <X className="w-4 h-4" />
+                    <span className="hidden sm:inline">Kapat</span>
+                  </button>
+                </div>
               </div>
             )}
           </div>
-          <p className="text-center text-xs text-cyan-300 font-mono">
-            Barkod veya QR kodu yeşil çerçevenin ortasına hizalayınız. Otomatik algılanır.
-          </p>
+
+          {/* Prominent Focus & Scan Shutter Button */}
+          {isCameraActive && (
+            <div className="flex flex-col items-center gap-3 pt-1">
+              <button
+                type="button"
+                onClick={handleManualFocusAndScan}
+                disabled={isManualScanning}
+                className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-cyan-500 via-sky-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-black font-black text-base sm:text-lg flex items-center justify-center gap-3 shadow-[0_0_30px_rgba(6,182,212,0.5)] active:scale-95 transition-all cursor-pointer border-2 border-white/60"
+              >
+                {isManualScanning ? (
+                  <>
+                    <RefreshCw className="w-6 h-6 animate-spin text-black" />
+                    <span>Odaklanıyor ve Taranıyor...</span>
+                  </>
+                ) : (
+                  <>
+                    <Target className="w-6 h-6 text-black animate-pulse" />
+                    <span>🎯 ODAKLA & BARKODU OKU</span>
+                  </>
+                )}
+              </button>
+              <p className="text-center text-xs text-cyan-300 font-mono">
+                Barkodu çerçeveye hizalayın ve <strong>"ODAKLA & BARKODU OKU"</strong> tuşuna basarak anında okutun.
+              </p>
+            </div>
+          )}
+
+          {/* Manual Scan Feedback Message */}
+          {manualScanMessage && (
+            <div
+              className={`p-3.5 rounded-xl text-xs flex items-center gap-2.5 animate-in fade-in ${
+                manualScanMessage.startsWith('✓')
+                  ? 'bg-emerald-950/70 border border-emerald-500/50 text-emerald-200 font-medium'
+                  : 'bg-amber-950/70 border border-amber-500/50 text-amber-200'
+              }`}
+            >
+              {manualScanMessage.startsWith('✓') ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              ) : (
+                <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+              )}
+              <span className="flex-1">{manualScanMessage}</span>
+            </div>
+          )}
         </div>
 
         {/* Demo Fast Scan Quick Chips */}
