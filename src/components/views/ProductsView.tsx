@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Package,
   Plus,
@@ -13,12 +13,15 @@ import {
   ExternalLink,
   QrCode,
   FlaskConical,
+  Upload,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { Button } from '../common/Button';
 import { Modal } from '../common/Modal';
 import { Badge } from '../common/Badge';
 import { Product, ProductCategory, ProductUnit } from '../../types';
 import { repository } from '../../services/storage';
+import { ProductVisual } from '../common/ProductVisual';
 
 interface ProductsViewProps {
   initialOpenAdd?: boolean;
@@ -36,6 +39,8 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialOpenAdd = fal
   const [isModalOpen, setIsModalOpen] = useState(initialOpenAdd);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [printBarcodeProduct, setPrintBarcodeProduct] = useState<Product | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Form states
   const [formData, setFormData] = useState({
@@ -55,6 +60,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialOpenAdd = fal
     description: '',
     phValue: '12.5',
     unNumber: '',
+    image: '',
     active: true,
   });
 
@@ -93,6 +99,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialOpenAdd = fal
       description: '',
       phValue: '10.5',
       unNumber: '',
+      image: '',
       active: true,
     });
     setEditingProduct(null);
@@ -119,11 +126,25 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialOpenAdd = fal
       description: p.description,
       phValue: p.phValue || '7.0',
       unNumber: p.unNumber || '',
+      image: p.image || '',
       active: p.active,
     });
     setEditingProduct(p);
     setFormError(null);
     setIsModalOpen(true);
+  };
+
+  // Handle Photo File Upload
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const base64 = event.target?.result as string;
+        setFormData((prev) => ({ ...prev, image: base64 }));
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleSaveProduct = (e: React.FormEvent) => {
@@ -306,13 +327,28 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialOpenAdd = fal
                     >
                       {/* Code & Name */}
                       <td className="py-3 px-4">
-                        <div className="font-mono text-cyan-300 font-bold text-xs">{p.code}</div>
-                        <div className="font-bold text-white text-xs">{p.name}</div>
-                        {p.phValue && (
-                          <span className="text-[10px] text-slate-400">
-                            pH: {p.phValue} {p.unNumber ? `| UN: ${p.unNumber}` : ''}
-                          </span>
-                        )}
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-10 h-10 shrink-0">
+                            <ProductVisual
+                              image={p.image}
+                              name={p.name}
+                              code={p.code}
+                              category={p.category}
+                              unit={p.unit}
+                              showBadge={false}
+                              className="w-10 h-10"
+                            />
+                          </div>
+                          <div>
+                            <div className="font-mono text-cyan-300 font-bold text-xs">{p.code}</div>
+                            <div className="font-bold text-white text-xs">{p.name}</div>
+                            {p.phValue && (
+                              <span className="text-[10px] text-slate-400">
+                                pH: {p.phValue} {p.unNumber ? `| UN: ${p.unNumber}` : ''}
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </td>
 
                       {/* Barcode */}
@@ -584,6 +620,63 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialOpenAdd = fal
               className="w-full bg-[#102A43] border border-cyan-500/30 rounded-xl p-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
               placeholder="Ürünün uygulama dozu, yüzey uyumluluğu ve temizlik performansı..."
             />
+          </div>
+
+          {/* Product Photo / Image Section */}
+          <div className="p-3 rounded-xl bg-[#07111F] border border-cyan-500/30 space-y-2">
+            <label className="block text-white font-bold text-xs flex items-center gap-1.5">
+              <ImageIcon className="w-4 h-4 text-cyan-400" />
+              Ürün Fotoğrafı / Kataloğa Özel Görsel
+            </label>
+
+            <div className="flex items-center gap-3">
+              <div className="w-16 h-16 shrink-0 rounded-lg overflow-hidden border border-cyan-500/30 bg-black/40">
+                <ProductVisual
+                  image={formData.image}
+                  name={formData.name || 'Ürün'}
+                  code={formData.code || 'TK-000'}
+                  category={formData.category}
+                  unit={formData.unit}
+                  showBadge={false}
+                  className="w-16 h-16"
+                />
+              </div>
+
+              <div className="flex-1 space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => fileInputRef.current?.click()}
+                    icon={<Upload className="w-3.5 h-3.5" />}
+                    className="border-cyan-500/40 text-cyan-200 text-xs"
+                  >
+                    Fotoğraf Yükle (Galeri / Dosya)
+                  </Button>
+
+                  {formData.image && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setFormData({ ...formData, image: '' })}
+                      className="text-red-400 text-xs"
+                    >
+                      Kaldır
+                    </Button>
+                  )}
+                </div>
+
+                <input
+                  type="text"
+                  placeholder="veya görsel web linki (https://...)"
+                  value={formData.image}
+                  onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+                  className="w-full bg-[#102A43] border border-cyan-500/30 rounded-lg px-2.5 py-1 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                />
+              </div>
+            </div>
           </div>
 
           {/* Action buttons */}
