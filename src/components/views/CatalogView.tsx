@@ -43,7 +43,7 @@ import { Badge } from '../common/Badge';
 import { Product, ProductCategory, UserRole } from '../../types';
 import { repository } from '../../services/storage';
 import { ProductVisual } from '../common/ProductVisual';
-import { generateCatalogPdf, triggerCatalogPrint } from '../../utils/catalogPdf';
+import { generateCatalogPdf, generateDirectCatalogPdf, triggerCatalogPrint, downloadPdfBlob } from '../../utils/catalogPdf';
 
 interface CatalogViewProps {
   userRole?: UserRole;
@@ -81,6 +81,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ userRole = 'authorized
   const [imageFileUrl, setImageFileUrl] = useState('');
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [pdfProgress, setPdfProgress] = useState<{ percent: number; message: string } | null>(null);
+  const [generatedPdfResult, setGeneratedPdfResult] = useState<{ url: string; fileName: string; blob?: Blob } | null>(null);
 
   // File Input Ref for Photo Upload
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -157,20 +158,43 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ userRole = 'authorized
   // Handle PDF Export
   const handleExportPdf = async () => {
     setIsGeneratingPdf(true);
-    setPdfProgress({ percent: 10, message: 'PDF Motoru başlatılıyor...' });
+    setGeneratedPdfResult(null);
+    setPdfProgress({ percent: 15, message: 'PDF Motoru ve A4 sayfaları başlatılıyor...' });
 
     const fileName = `Teori_Kimya_${showPrices ? 'Fiyatli' : 'Fiyatsiz'}_Katalog_${
       new Date().toISOString().split('T')[0]
     }.pdf`;
 
-    const success = await generateCatalogPdf('catalog-pdf-export-root', fileName, (percent, message) => {
-      setPdfProgress({ percent, message });
-    });
+    // Direct vector & photo generator: fast, beautiful, 100% reliable on iOS & Android
+    const result = generateDirectCatalogPdf(
+      activeCatalogProducts,
+      company,
+      {
+        showPrices,
+        priceFormat,
+        showStock: showStockStatus,
+        showSpecs,
+        theme: catalogTheme,
+      },
+      fileName,
+      (percent, message) => {
+        setPdfProgress({ percent, message });
+      }
+    );
 
-    setTimeout(() => {
-      setIsGeneratingPdf(false);
-      setPdfProgress(null);
-    }, 800);
+    if (result.success && result.url) {
+      setGeneratedPdfResult({
+        url: result.url,
+        fileName,
+        blob: result.blob,
+      });
+      setPdfProgress({ percent: 100, message: 'PDF Başarıyla Oluşturuldu ve İndirildi!' });
+    } else {
+      setPdfProgress({ percent: 100, message: result.error || 'PDF oluşturulamadı.' });
+      setTimeout(() => {
+        setIsGeneratingPdf(false);
+      }, 3000);
+    }
   };
 
   // Handle Photo File Upload
@@ -1002,39 +1026,117 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ userRole = 'authorized
         </div>
       </div>
 
-      {/* PDF Generation Progress Modal */}
+      {/* PDF Generation Progress & Download Modal */}
       <Modal
         isOpen={isGeneratingPdf}
-        onClose={() => {}}
-        title="PDF Kataloğu Hazırlanıyor"
-        subtitle="Lütfen bekleyiniz, A4 yüksek çözünürlüklü sayfalar taranıyor..."
+        onClose={() => {
+          setIsGeneratingPdf(false);
+          setGeneratedPdfResult(null);
+        }}
+        title={generatedPdfResult ? 'PDF Kataloğu Hazır' : 'PDF Kataloğu Hazırlanıyor'}
+        subtitle={
+          generatedPdfResult
+            ? 'Dosyanız cihazınıza aktarılıyor. Dilerseniz hemen tarayıcıda açabilirsiniz.'
+            : 'Lütfen bekleyiniz, A4 yüksek çözünürlüklü sayfalar derleniyor...'
+        }
         maxWidth="md"
       >
         <div className="p-6 text-center space-y-4">
-          <div className="w-16 h-16 rounded-full bg-cyan-500/20 border-2 border-cyan-400 flex items-center justify-center mx-auto animate-pulse">
-            <BookOpen className="w-8 h-8 text-cyan-400 animate-bounce" />
-          </div>
+          {generatedPdfResult ? (
+            <>
+              <div className="w-16 h-16 rounded-full bg-emerald-500/20 border-2 border-emerald-400 flex items-center justify-center mx-auto shadow-[0_0_25px_rgba(16,185,129,0.4)]">
+                <CheckCircle2 className="w-9 h-9 text-emerald-400" />
+              </div>
 
-          <div className="space-y-1">
-            <h3 className="text-base font-bold text-white">
-              {pdfProgress?.message || 'Sayfalar derleniyor...'}
-            </h3>
-            <p className="text-xs text-slate-400">
-              {showPrices ? 'Fiyatlı Katalog' : 'Fiyatsız Tanıtım Kataloğu'} • Toplam {activeCatalogProducts.length} Ürün
-            </p>
-          </div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-black text-white">
+                  Katalog Başarıyla Oluşturuldu!
+                </h3>
+                <p className="text-xs text-slate-300">
+                  {showPrices ? 'Fiyatlı Katalog' : 'Fiyatsız Tanıtım Portföyü'} • {activeCatalogProducts.length} Ürün Listelendi
+                </p>
+                <p className="text-[11px] text-cyan-300 font-mono mt-1">
+                  {generatedPdfResult.fileName}
+                </p>
+              </div>
 
-          {/* Progress Bar */}
-          <div className="w-full bg-slate-800 rounded-full h-3 overflow-hidden border border-cyan-500/30">
-            <div
-              className="bg-gradient-to-r from-cyan-500 to-emerald-500 h-full transition-all duration-300"
-              style={{ width: `${pdfProgress?.percent || 20}%` }}
-            />
-          </div>
+              <div className="p-3.5 rounded-xl bg-[#07111F] border border-cyan-500/30 text-xs text-slate-300 text-left space-y-2">
+                <div className="flex items-center gap-2 text-emerald-400 font-bold">
+                  <Check className="w-4 h-4" />
+                  <span>İndirme işlemi otomatik başlatıldı.</span>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  iPhone Safari veya diğer mobil tarayıcılarda indirme bildirimi çıkmadıysa aşağıdaki <strong>"PDF'i Görüntüle / Aç"</strong> butonuna dokunarak doğrudan tam ekran açabilir veya Paylaş menüsünden kaydedebilirsiniz.
+                </p>
+              </div>
 
-          <p className="text-[11px] font-mono text-cyan-300">
-            %{pdfProgress?.percent || 20} Tamamlandı
-          </p>
+              <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+                <Button
+                  variant="primary"
+                  className="w-full bg-cyan-500 hover:bg-cyan-400 text-black font-black py-3 shadow-[0_0_15px_rgba(6,182,212,0.4)]"
+                  icon={<FileText className="w-4 h-4" />}
+                  onClick={() => {
+                    if (generatedPdfResult.url) {
+                      window.open(generatedPdfResult.url, '_blank');
+                    }
+                  }}
+                >
+                  📄 PDF'i Tarayıcıda Görüntüle / Aç
+                </Button>
+
+                <Button
+                  variant="secondary"
+                  className="w-full sm:w-auto"
+                  icon={<Download className="w-4 h-4" />}
+                  onClick={() => {
+                    if (generatedPdfResult.blob) {
+                      downloadPdfBlob(generatedPdfResult.blob, generatedPdfResult.fileName);
+                    }
+                  }}
+                >
+                  Tekrar İndir
+                </Button>
+
+                <Button
+                  variant="ghost"
+                  className="w-full sm:w-auto text-slate-400 hover:text-white"
+                  onClick={() => {
+                    setIsGeneratingPdf(false);
+                    setGeneratedPdfResult(null);
+                  }}
+                >
+                  Kapat
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="w-16 h-16 rounded-full bg-cyan-500/20 border-2 border-cyan-400 flex items-center justify-center mx-auto animate-pulse">
+                <BookOpen className="w-8 h-8 text-cyan-400 animate-bounce" />
+              </div>
+
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-white">
+                  {pdfProgress?.message || 'Sayfalar derleniyor...'}
+                </h3>
+                <p className="text-xs text-slate-400">
+                  {showPrices ? 'Fiyatlı Katalog' : 'Fiyatsız Tanıtım Kataloğu'} • Toplam {activeCatalogProducts.length} Ürün
+                </p>
+              </div>
+
+              {/* Progress Bar */}
+              <div className="w-full bg-slate-800 rounded-full h-3 overflow-hidden border border-cyan-500/30">
+                <div
+                  className="bg-gradient-to-r from-cyan-500 to-emerald-500 h-full transition-all duration-300"
+                  style={{ width: `${pdfProgress?.percent || 20}%` }}
+                />
+              </div>
+
+              <p className="text-[11px] font-mono text-cyan-300">
+                %{pdfProgress?.percent || 20} Tamamlandı
+              </p>
+            </>
+          )}
         </div>
       </Modal>
 

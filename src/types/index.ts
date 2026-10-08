@@ -55,6 +55,7 @@ export interface Product {
   tunnelCode?: string;   // Tünel Kodu (E)
   phValue?: string;      // pH değeri
   density?: string;      // Yoğunluk g/cm3
+  dilutionRate?: string; // Seyreltme oranı (örn: 1/10 - 1/20)
   shelfLocation?: string; // Raf lokasyonu
   sdsAvailable?: boolean;
   createdAt: string;
